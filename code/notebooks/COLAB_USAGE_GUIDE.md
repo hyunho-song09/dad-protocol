@@ -4,130 +4,89 @@
 
 1. Open `DAD_protocol.ipynb`.
 2. Run `0. Setup Environment`.
-3. If the kernel restarts after condacolab, run all cells again.
-4. Paste your protein sequence or FASTA.
-5. Paste a ligand SMILES string.
-6. Keep `STRUCTURE_MODE="auto"` to predict from sequence, or switch to `existing_or_upload` for your own PDB.
-7. Run docking and download the result archive.
+3. If condacolab restarts the kernel, run all cells again.
+4. In SS1, paste one or more protein FASTA records.
+5. In SS2, keep `STRUCTURE_MODE="colabfold_af2"` for direct AF2 prediction, or choose `auto`, `af3_results`, `esmfold_api`, or `user_pdb`.
+6. In SS3-SS4, create `phase_a/structure_registry.tsv`.
+7. In SS5, paste one or more SMILES entries.
+8. In SS6-SS8, select protein-ligand pairs, run GNINA, and aggregate results.
 
-## Progress Bars
+## Structure Modes
 
-Every notebook step prints a progress bar:
+| Option | Use When |
+|---|---|
+| `colabfold_af2` | Default ColabFold AF2 prediction with multi-FASTA batching |
+| `auto` | Try cache, then ESMFold API, then ColabFold AF2 fallback |
+| `af3_results` | Ingest pre-computed AlphaFold Server or local AF3 CIF results |
+| `esmfold_api` | ESMFold API for short proteins, with optional ColabFold fallback |
+| `user_pdb` | Use uploaded PDBs or files in `USER_PDB_DIR` |
 
-```text
-Setup Environment: [########------------] 50% 4/8 chemistry packages
-```
+## Reuse Mode
 
-Long-running commands such as ESMFold API, ColabFold AF2, and GNINA still report only step-level progress.
+Phase A is sequence-only and ligand-independent. To test new ligands against the same proteins:
+
+1. Keep the same work directory.
+2. Skip SS1-SS4 if `phase_a/structure_registry.tsv` already exists.
+3. Run SS5 onward with new `smiles_text`.
+
+The notebook reloads `structure_registry.tsv` when Phase B starts in a fresh runtime.
 
 ## Accepted Inputs
-
-Protein sequence:
-
-```text
-MRNMSIFMKVMVIVLILALGMIVIGVYSTFAL...
-```
 
 FASTA:
 
 ```text
 >ProteinA
 MRNMSIFMKVMVIVLILALGMIVIGVYSTFAL...
+>ProteinB
+MNNNKQQQQ...
 ```
 
 SMILES:
 
 ```text
-CC[C@H](C)[C@@H](C(=O)O)NC(=O)[C@H](C)N
-```
-
-Named SMILES:
-
-```text
 Ala-Ile:CC[C@H](C)[C@@H](C(=O)O)NC(=O)[C@H](C)N
+LigandB:CCO
 ```
 
-Multiple ligands:
+Semicolon-separated SMILES are also accepted:
 
 ```text
 LigandA:CCO;LigandB:CCN
 ```
 
-## Structure Options
-
-| Option | Use When |
-|---|---|
-| `auto` | Default: cache/uploaded PDB, then ESMFold API, then ColabFold AF2 fallback |
-| `existing_or_upload` | You already have PDB files |
-| `esmfold_api` | ESMFold API only, with optional ColabFold fallback |
-| `colabfold` | Direct ColabFold AF2 using the AlphaFold2.ipynb backend |
-
-For `existing_or_upload`, put files in:
-
-```text
-WORK_DIR/structures/
-```
-
-or set:
-
-```text
-EXISTING_PDB_DIR=/path/to/pdbs
-```
-
-The expected file name is `Protein_1.pdb` unless the FASTA header gives another ID.
-
-
-## Reuse Mode
-
-To test new ligands against the same protein:
-
-1. Keep the same `job_name`.
-2. Change only `custom_ligand_smiles`.
-3. Run from `1. Input Data` onward.
-
-The structure cell reuses `structure_manifest.tsv` and the sequence-hash cache before any new prediction.
-
 ## Outputs
 
 | File | Content |
 |---|---|
-| `results/docking_results.tsv` | ranked docking results |
-| `results/tables/ranked_results.tsv` | same ranked table |
-| `results/tables/protein_summary.tsv` | best score per protein |
-| `results/tables/ligand_summary.tsv` | best score per ligand |
-| `results/figures/*.png` | result plots |
-| `results/reproducibility_footprint.json` | runtime metadata |
-| `<job_name>_results.zip` | result archive |
+| `phase_a/structure_registry.tsv` | protein structure paths, confidence, pocket metadata |
+| `phase_a/structure_cache/*.pdb` | reusable PDB files keyed by sequence SHA |
+| `phase_a/pocket_cache/` | P2Rank outputs when available |
+| `phase_b/ligands/*.sdf` | reusable 3D ligand files keyed by SMILES SHA |
+| `phase_b/runs/<case_id>/docked.sdf` | GNINA output per selected pair |
+| `phase_b/docking_master.csv` | append-only selected-pair result table |
+| `manifest.json` | reproducibility footprint |
 
 ## Troubleshooting
 
-### No ligands parsed
-
-Paste either raw SMILES or `name:SMILES`. Raw SMILES is now accepted.
-
-### No PDB structures found
-
-Use one of:
-
-- keep `STRUCTURE_MODE="auto"` and retry;
-- upload `Protein_1.pdb` to `WORK_DIR/structures`;
-- set `EXISTING_PDB_DIR`.
-
-
 ### ESMFold HTTP 413
 
-HTTP 413 means the ESMFold API rejected the sequence size. Keep `STRUCTURE_MODE="auto"`; the notebook will switch to ColabFold AF2 and apply the TensorFlow crash patch used in the AlphaFold2.ipynb reference notebook.
+HTTP 413 means the ESMFold API rejected the sequence size. Use `STRUCTURE_MODE="auto"` or `STRUCTURE_MODE="colabfold_af2"`.
 
-For the most conservative AF2 setting, use `AF2_PRESET="high_accuracy"`. If you also set `AF2_RELAX_TOP_N=1`, the notebook installs OpenMM/PDBFixer before AMBER relaxation.
+### ColabFold TensorFlow Import Error
 
-### GNINA not found
+The notebook applies the TensorFlow shared-object cleanup used in the reference AlphaFold2 notebook before importing ColabFold. Check:
 
-Run Setup with:
-
-```python
-INSTALL_GNINA = True
+```text
+phase_a/tensorflow_colabfold_patch.log
+phase_a/colabfold_install.log
+phase_a/colabfold.log
 ```
 
-### GPU quota exceeded
+### P2Rank Not Found
 
-Use `exec_mode="prepare_only"` to prepare inputs without docking.
+Pocket detection falls back to the protein geometric center, so GNINA can still run. Install P2Rank for better pocket centers.
+
+### GNINA Not Found
+
+Run SS0 again in a Linux or Colab runtime. If GNINA is still unavailable, SS7 reports `gnina_missing` for selected pairs.

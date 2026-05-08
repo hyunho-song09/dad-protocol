@@ -223,6 +223,19 @@ Re-run safety: new SMILES → Phase A 0% recompute. New protein → only new pro
 
 RESTART_REQUESTED condacolab flag, TF `.so` cleanup (`patch_tensorflow_for_colabfold()`), `ensure_colabfold_ready()` with `colabfold[alphafold-minus-jax] @ git+...`, `apply_af2_preset()`, `ensure_amber_ready()` (OpenMM/PDBFixer), `AF2_RELAX_TOP_N`, ESMFold 413 fallback chain — all preserved in `§2` (Phase A structure cell).
 
+## 2026-05-08: Codex review of two-phase Claude update
+
+### Findings fixed
+
+- Restored the TensorFlow shared-object cleanup so it runs before TensorFlow/AlphaFold imports. The previous implementation imported TensorFlow first, which could reproduce the Python 3.12 undefined-symbol crash.
+- Removed `--zip` from the `colabfold_batch` command so rank PDB files remain directly discoverable by downstream cells.
+- Added cache registration before Phase A dispatch so existing `phase_a/structure_cache/*.pdb` files prevent unnecessary AF2 reruns.
+- Added `USER_PDB_DIR` for non-interactive user PDB ingestion.
+- Added protein-name and ligand-name sanitization for safe cache paths.
+- Added P2Rank failure fallback to protein geometric center instead of docking at origin.
+- Added Phase B `structure_registry.tsv` reload so new ligand scoring can resume in a fresh runtime without rerunning Phase A.
+- Updated README and Colab guide to match the two-phase notebook variables and output paths.
+
 ### Files updated
 
 - `Publication/DAD_protocol.ipynb`

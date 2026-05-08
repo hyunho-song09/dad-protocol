@@ -7,28 +7,27 @@ DAD is a user-input protein-ligand docking notebook and code package.
 
 ## What It Does
 
-- accepts user protein sequence or FASTA;
-- accepts unnamed SMILES or `name:SMILES`;
+- accepts multi-FASTA protein input;
+- accepts unnamed SMILES, `name:SMILES`, or semicolon-separated SMILES;
 - prepares 3D ligand SDF files;
-- reuses cached/uploaded PDB files or predicts with automatic ESMFold/ColabFold AF2 fallback;
-- creates an automatic docking box;
-- runs GNINA docking when available;
-- exports ranked results, plots, and a reproducibility JSON.
+- separates Phase A structure preparation from Phase B ligand scoring;
+- reuses cached structures and selected protein-ligand pair outputs;
+- runs GNINA docking when available.
 
 ## Quick Start
 
 1. Open the Colab notebook.
 2. Run `0. Setup Environment`.
 3. If condacolab restarts the kernel, run all cells again.
-4. Paste your protein sequence in `custom_protein_fasta`.
-5. Paste a SMILES string in `custom_ligand_smiles`.
-6. Keep `STRUCTURE_MODE="auto"` to predict from sequence, or provide your own PDB with `existing_or_upload`.
-7. Download `docking_results.tsv` or the result zip.
+4. In SS1, paste multi-FASTA sequences.
+5. In SS2, keep `STRUCTURE_MODE="colabfold_af2"` or choose `auto`, `af3_results`, `esmfold_api`, or `user_pdb`.
+6. In SS5, paste SMILES entries in `smiles_text`.
+7. Select protein-ligand pairs and export `phase_b/docking_master.csv`.
 
 
-## Reuse Existing Structures
+## Two-Phase Reuse
 
-Keep the same `job_name` and change `custom_ligand_smiles` to score new ligands against the cached PDB. The notebook stores reusable structures in `WORK_DIR/structure_cache` or Drive `_structure_cache` when Drive output is enabled. Long proteins that exceed ESMFold API limits fall back to ColabFold AF2.
+Phase A writes `phase_a/structure_registry.tsv` and reusable PDB files in `phase_a/structure_cache`. Phase B can be rerun with new `smiles_text` without re-running structure prediction.
 
 ## Input Examples
 

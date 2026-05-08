@@ -6,35 +6,37 @@
 
 | Phase | Steps | Input | Output |
 |---|---|---|---|
-| **Phase A** — Structure prep (run once) | §0–4 | Multi-FASTA | PDB + pocket cache, `structure_registry.tsv` |
-| **Phase B** — Selective ligand scoring | §5–10 | Multi-SMILES + widget selection | `docking_master.csv`, heatmap |
+| Phase A: structure prep | SS0-SS4 | Multi-FASTA | PDB cache, pocket cache, `structure_registry.tsv` |
+| Phase B: selective ligand scoring | SS5-SS10 | Multi-SMILES and selected pairs | `docking_master.csv`, ranked table, heatmap |
 
 ## What It Does
 
 | Stage | Description |
 |---|---|
-| Input (Phase A) | Multi-FASTA; raw sequences auto-named Protein_1, Protein_2, ... |
-| Structure (Phase A) | `colabfold_batch` multi-FASTA CLI (default, `--num-models 1 --num-recycle 3 --sort-queries-by length`); or ingest AF3 Server CIF results; or ESMFold API; or user PDB |
-| Pocket (Phase A) | P2Rank batch on all proteins in structure_registry |
-| Input (Phase B) | Multi-SMILES (`name:SMILES` per line); SHA-keyed SDF cache |
-| Selection (Phase B) | ipywidgets multi-select: choose protein subset × ligand subset |
-| Docking (Phase B) | GNINA cross-product of selected pairs only; cache-hit pairs skipped |
-| Export | `docking_master.csv` (append-only), ranked table, CNN-affinity heatmap |
+| Input | Multi-FASTA; raw sequences are auto-named `Protein_1`, `Protein_2`, ... |
+| Structure | Default `colabfold_af2`; alternatives are `af3_results`, `esmfold_api`, `user_pdb`, and `auto` |
+| Pocket | P2Rank batch when available; protein-center fallback when P2Rank is unavailable |
+| Ligand | Multi-SMILES, one `name:SMILES` per line or semicolon-separated; SHA-keyed SDF cache |
+| Selection | `ipywidgets` multi-select for protein subset and ligand subset |
+| Docking | GNINA cross-product of selected pairs only; completed pair cache is reused |
+| Export | `phase_b/docking_master.csv`, ranked table, and diagnostic heatmap |
 
 ## User Workflow
 
-**Phase A (run once per protein set):**
-1. §1 Paste multi-FASTA sequences.
-2. §2 Set `STRUCTURE_MODE = "colabfold_af2"` (default) or `"af3_results"` if you have AlphaFold Server results.
-3. §3–4 P2Rank pocket detection + `structure_registry.tsv` summary.
+Phase A, run once per protein set:
 
-**Phase B (repeat with new SMILES or new subset):**
-4. §5 Paste SMILES (`name:SMILES` per line).
-5. §6 Select proteins and ligands in the widget UI.
-6. §7 Click **Run docking on selection**.
-7. §8 Export `docking_master.csv`.
+1. SS1: paste multi-FASTA sequences.
+2. SS2: keep `STRUCTURE_MODE="colabfold_af2"` or choose another backend.
+3. SS3-SS4: run pocket detection and write `structure_registry.tsv`.
 
-Re-running Phase B with new SMILES does **not** re-run Phase A.
+Phase B, repeat as needed:
+
+1. SS5: paste new SMILES.
+2. SS6: select proteins and ligands.
+3. SS7: run docking for selected pairs.
+4. SS8: update `docking_master.csv`.
+
+Re-running Phase B with new SMILES does not re-run Phase A.
 
 ## Install
 

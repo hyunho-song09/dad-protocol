@@ -109,3 +109,28 @@ The failing runtime reached AlphaFold/TensorFlow import, but the TensorFlow bina
 - `code/notebooks/DAD_protocol.ipynb`
 - `README.md`
 - `code/notebooks/COLAB_USAGE_GUIDE.md`
+
+
+## 2026-05-08: ESMFold 413 and ColabFold Python 3.12 fallback
+
+### User-facing symptom
+
+Longer custom proteins failed with:
+
+```text
+HTTPError: HTTP Error 413: Request Entity Too Large
+```
+
+Switching to `colabfold` also failed because the previous notebook blocked ColabFold on Python 3.12.
+
+### Root cause
+
+The ESMFold public API can reject long requests. The previous ColabFold block was too conservative: the project reference `AW1_ref/AlphaFold2.ipynb` already includes the ColabFold v1.6.1 install path and a TensorFlow shared-object cleanup that avoids the observed TensorFlow import crash.
+
+### Fix
+
+- `STRUCTURE_MODE` now defaults to `auto`.
+- Auto mode tries cache/uploaded PDB first, then ESMFold API for shorter proteins, then ColabFold AF2 fallback.
+- ColabFold install now uses the AlphaFold2.ipynb backend: `colabfold[alphafold-minus-jax] @ git+https://github.com/sokrypton/ColabFold`.
+- The notebook applies the TensorFlow `.so` cleanup from the reference AlphaFold2 notebook before ColabFold import.
+- AF2 quality controls were added: `AF2_PRESET`, `AF2_MODEL_TYPE`, `AF2_NUM_RECYCLES`, `AF2_NUM_MODELS`, `AF2_NUM_SEEDS`, and `AF2_RELAX_TOP_N`.

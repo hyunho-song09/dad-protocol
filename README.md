@@ -10,7 +10,7 @@ DAD is a user-input protein-ligand docking notebook and code package.
 - accepts user protein sequence or FASTA;
 - accepts unnamed SMILES or `name:SMILES`;
 - prepares 3D ligand SDF files;
-- reuses cached/uploaded PDB files or predicts with the ESMFold API;
+- reuses cached/uploaded PDB files or predicts with automatic ESMFold/ColabFold AF2 fallback;
 - creates an automatic docking box;
 - runs GNINA docking when available;
 - exports ranked results, plots, and a reproducibility JSON.
@@ -22,13 +22,13 @@ DAD is a user-input protein-ligand docking notebook and code package.
 3. If condacolab restarts the kernel, run all cells again.
 4. Paste your protein sequence in `custom_protein_fasta`.
 5. Paste a SMILES string in `custom_ligand_smiles`.
-6. Keep `STRUCTURE_MODE="esmfold_api"` to predict from sequence, or provide your own PDB with `existing_or_upload`.
+6. Keep `STRUCTURE_MODE="auto"` to predict from sequence, or provide your own PDB with `existing_or_upload`.
 7. Download `docking_results.tsv` or the result zip.
 
 
 ## Reuse Existing Structures
 
-Keep the same `job_name` and change `custom_ligand_smiles` to score new ligands against the cached PDB. The notebook stores reusable structures in `WORK_DIR/structure_cache` or Drive `_structure_cache` when Drive output is enabled.
+Keep the same `job_name` and change `custom_ligand_smiles` to score new ligands against the cached PDB. The notebook stores reusable structures in `WORK_DIR/structure_cache` or Drive `_structure_cache` when Drive output is enabled. Long proteins that exceed ESMFold API limits fall back to ColabFold AF2.
 
 ## Input Examples
 

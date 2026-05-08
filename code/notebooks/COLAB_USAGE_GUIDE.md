@@ -7,7 +7,7 @@
 3. If the kernel restarts after condacolab, run all cells again.
 4. Paste your protein sequence or FASTA.
 5. Paste a ligand SMILES string.
-6. Keep `STRUCTURE_MODE="esmfold_api"` to predict from sequence, or switch to `existing_or_upload` for your own PDB.
+6. Keep `STRUCTURE_MODE="auto"` to predict from sequence, or switch to `existing_or_upload` for your own PDB.
 7. Run docking and download the result archive.
 
 ## Progress Bars
@@ -18,7 +18,7 @@ Every notebook step prints a progress bar:
 Setup Environment: [########------------] 50% 4/8 chemistry packages
 ```
 
-Long-running commands such as ESMFold API prediction and GNINA still report only step-level progress.
+Long-running commands such as ESMFold API, ColabFold AF2, and GNINA still report only step-level progress.
 
 ## Accepted Inputs
 
@@ -57,9 +57,10 @@ LigandA:CCO;LigandB:CCN
 
 | Option | Use When |
 |---|---|
-| `esmfold_api` | Default sequence-to-PDB prediction without AlphaFold/TensorFlow installs |
+| `auto` | Default: cache/uploaded PDB, then ESMFold API, then ColabFold AF2 fallback |
 | `existing_or_upload` | You already have PDB files |
-| `colabfold` | Optional advanced mode on Python versions compatible with AlphaFold/TensorFlow |
+| `esmfold_api` | ESMFold API only, with optional ColabFold fallback |
+| `colabfold` | Direct ColabFold AF2 using the AlphaFold2.ipynb backend |
 
 For `existing_or_upload`, put files in:
 
@@ -108,9 +109,14 @@ Paste either raw SMILES or `name:SMILES`. Raw SMILES is now accepted.
 
 Use one of:
 
-- keep `STRUCTURE_MODE="esmfold_api"` and retry;
+- keep `STRUCTURE_MODE="auto"` and retry;
 - upload `Protein_1.pdb` to `WORK_DIR/structures`;
 - set `EXISTING_PDB_DIR`.
+
+
+### ESMFold HTTP 413
+
+HTTP 413 means the ESMFold API rejected the sequence size. Keep `STRUCTURE_MODE="auto"`; the notebook will switch to ColabFold AF2 and apply the TensorFlow crash patch used in the AlphaFold2.ipynb reference notebook.
 
 ### GNINA not found
 

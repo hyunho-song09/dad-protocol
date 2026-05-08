@@ -1,6 +1,6 @@
 # DAD: Dynamic Affinity Dock
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/[USER_TO_PROVIDE_GITHUB_OWNER]/[USER_TO_PROVIDE_GITHUB_REPO]/blob/main/code/notebooks/DAD_protocol.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hyunho-song09/dad-protocol/blob/main/code/notebooks/DAD_protocol.ipynb)
 
 **Google Colab에서 바로 실행 / Run directly in Google Colab:**
 위 배지를 클릭하면 브라우저에서 DAD 프로토콜이 즉시 열립니다. GPU 런타임(T4 권장)을 선택한 후 "모두 실행"을 누르면 Tier 1 재현 분석(3 proteins × 2 ligands)이 GPU 없이 약 2분 안에 완료됩니다.

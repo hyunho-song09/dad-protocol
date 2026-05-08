@@ -10,7 +10,7 @@ All data underlying the quantitative claims of this manuscript are publicly avai
 
 The DAD project repository contains all in-tree validation artifacts, runner scripts, and per-case outputs.
 
-- **Repository URL**: [USER_TO_PROVIDE_REPO_URL] (corresponding author has completed the GitHub OAuth step; team-lead has proposed `dad-protocol` as a public repository — final URL pending). Proposed git tag at submission: `v0.1.0`.
+- **Repository URL**: https://github.com/hyunho-song09/dad-protocol (corresponding author has completed the GitHub OAuth step; team-lead has proposed `dad-protocol` as a public repository — final URL pending). Proposed git tag at submission: `v0.1.0`.
 - **Zenodo archive**: on hold per corresponding author (2026-05-08); to be minted at primary-paper acceptance.
 - **Working tree root** (during development): `d:\project\experiment\DAD\` (mirrored to repository at submission).
 

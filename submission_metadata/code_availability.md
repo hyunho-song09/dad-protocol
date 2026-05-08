@@ -8,7 +8,7 @@ All code underlying this protocol is open-source and available through the DAD p
 
 ## Repository
 
-- **URL**: [USER_TO_PROVIDE_REPO_URL] (corresponding author has completed the GitHub OAuth step; team-lead has proposed `dad-protocol` as a public repository — final URL pending)
+- **URL**: https://github.com/hyunho-song09/dad-protocol (corresponding author has completed the GitHub OAuth step; team-lead has proposed `dad-protocol` as a public repository — final URL pending)
 - **Archived release**: Zenodo DOI on hold per corresponding author (2026-05-08); to be minted at acceptance of this protocol manuscript.
 - **Git tag at submission**: `v0.1.0` (proposed)
 

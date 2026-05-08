@@ -23,7 +23,7 @@ DAD's reference-data dependency tree is entirely free and registration-free (RCS
 
 The supporting primary paper is peer-reviewed and published in *iScience* 2026, satisfying Nature Protocols' supporting-research-paper requirement. The protocol manuscript is intentionally bounded to the current evidence: Tier 1 deterministic replay regression (six pairs from the published primary paper) and the 16-case open RCSB co-crystal seed external redocking. A live forward worked example from raw FASTA + SMILES through report outputs is queued as the next deliverable, and Tier-2 generalisation plus decoy / enrichment evaluation are signposted in the manuscript as Phase D / companion-study scope rather than claimed here.
 
-Code is available under MIT (with the GNINA wrapper kept separate for upstream GPL-2.0 compliance) at [USER_TO_PROVIDE_REPO_URL] (corresponding author has completed the GitHub OAuth step; final repository URL pending). All quantitative claims are reproducible from `06_Report/Mr_Repro/results/benchmark/validation_table.tsv` and `06_Report/Mr_Repro/external_validation/rcsb_seed/redocking_results.tsv`. Five suggested reviewers are listed in `submission_metadata/suggested_reviewers.md`.
+Code is available under MIT (with the GNINA wrapper kept separate for upstream GPL-2.0 compliance) at https://github.com/hyunho-song09/dad-protocol (corresponding author has completed the GitHub OAuth step; final repository URL pending). All quantitative claims are reproducible from `06_Report/Mr_Repro/results/benchmark/validation_table.tsv` and `06_Report/Mr_Repro/external_validation/rcsb_seed/redocking_results.tsv`. Five suggested reviewers are listed in `submission_metadata/suggested_reviewers.md`.
 
 We thank the editors for their consideration.
 

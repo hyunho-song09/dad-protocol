@@ -473,6 +473,556 @@ def _parse_sdf_atoms_bonds(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Multi-pose animation HTML (GININA_Template cells 16-17)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def generate_multi_pose_animation_html(
+    receptor_pdb: str,
+    docked_sdf: str,
+    output_html: str,
+    width: int = 900,
+    height: int = 600,
+    interval_ms: int = 1200,
+    cartoon_style: str = "spectrum",
+) -> str:
+    """Generate py3Dmol HTML with all GNINA poses as animation frames.
+
+    Ports GININA_Template.ipynb cells 16-17 (addModelsAsFrames + animate).
+    The receptor is shown as a cartoon and each docked pose cycles as a frame.
+    Complements generate_py3dmol_html (single-pose static) — both can be used
+    together per case.
+    """
+    if not Path(receptor_pdb).exists():
+        raise FileNotFoundError(f"Receptor PDB not found: {receptor_pdb}")
+    if not Path(docked_sdf).exists():
+        raise FileNotFoundError(f"Docked SDF not found: {docked_sdf}")
+
+    receptor_data = Path(receptor_pdb).read_text(encoding="utf-8", errors="replace")
+    sdf_data = Path(docked_sdf).read_text(encoding="utf-8", errors="replace")
+
+    # count poses for display
+    n_poses = len([m for m in sdf_data.split("$$$$") if m.strip()])
+
+    cartoon_color = json.dumps(cartoon_style)
+
+    html = _ANIMATION_TEMPLATE.format(
+        width=width,
+        height=height,
+        receptor_data=json.dumps(receptor_data),
+        sdf_data=json.dumps(sdf_data),
+        interval_ms=interval_ms,
+        cartoon_color=cartoon_color,
+        n_poses=n_poses,
+        docked_sdf_name=Path(docked_sdf).name,
+    )
+
+    Path(output_html).parent.mkdir(parents=True, exist_ok=True)
+    Path(output_html).write_text(html, encoding="utf-8")
+    return output_html
+
+
+_ANIMATION_TEMPLATE = """\
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>DAD Multi-Pose Animation ({n_poses} poses)</title>
+<script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+<style>
+  body {{ font-family: Arial, sans-serif; background: #fff; margin: 12px; }}
+  #viewer {{ width: {width}px; height: {height}px; position: relative; }}
+  h3 {{ color: #1a237e; margin-bottom: 4px; }}
+  .info {{ font-size: 0.85em; color: #555; margin-bottom: 8px; }}
+  button {{ margin: 4px 2px; padding: 4px 12px; cursor: pointer; }}
+</style>
+</head>
+<body>
+<h3>DAD Multi-Pose Animation</h3>
+<div class="info">
+  {n_poses} GNINA poses from <code>{docked_sdf_name}</code> — cycling every {interval_ms} ms
+</div>
+<div id="viewer"></div>
+<div>
+  <button onclick="animViewer.animate({{interval:{interval_ms}}})">Play</button>
+  <button onclick="animViewer.stopAnimate()">Pause</button>
+  <button onclick="animViewer.setFrame(0); animViewer.render();">Reset</button>
+</div>
+<script>
+(function() {{
+  var viewer = $3Dmol.createViewer('viewer', {{backgroundColor: 'white'}});
+  window.animViewer = viewer;
+
+  // receptor (model 0)
+  viewer.addModel({receptor_data}, 'pdb');
+  viewer.setStyle({{model: 0}}, {{
+    cartoon: {{color: {cartoon_color}, opacity: 0.70}},
+    stick: {{radius: 0.10, colorscheme: 'grayCarbon'}}
+  }});
+
+  // all docked poses as animation frames (model 1+)
+  viewer.addModelsAsFrames({sdf_data}, 'sdf');
+  viewer.setStyle({{model: -1}}, {{stick: {{colorscheme: 'greenCarbon', radius: 0.22}}}});
+
+  viewer.zoomTo({{model: -1}});
+  viewer.rotate(90, 'y');
+  viewer.animate({{interval: {interval_ms}, loop: 'forward'}});
+  viewer.render();
+}})();
+</script>
+</body>
+</html>
+"""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Multi-case grid HTML
+# ─────────────────────────────────────────────────────────────────────────────
+
+def generate_multi_case_grid_html(
+    cases: List[Dict],
+    output_html: str,
+    columns: int = 3,
+    width: int = 350,
+    height: int = 280,
+) -> str:
+    """Composite HTML showing all selected (protein × ligand) pairs in a grid.
+
+    Each cell contains a small py3Dmol view with the best docked pose and a
+    score summary text block below it. Self-contained with 3Dmol.js CDN.
+
+    Each entry in ``cases`` must have keys:
+        case_id, receptor_pdb, docked_sdf, ligand_name
+    Optional keys: contact_residues (List[int]), score_summary (str).
+    """
+    cell_blocks = []
+    for case in cases:
+        case_id = case.get("case_id", "case")
+        receptor_pdb = case.get("receptor_pdb", "")
+        docked_sdf = case.get("docked_sdf", "")
+        ligand_name = case.get("ligand_name", case_id)
+        score_summary = case.get("score_summary", "")
+        contact_ids = case.get("contact_residues", [])
+
+        # Only embed data for cases where files exist
+        if Path(receptor_pdb).exists() and Path(docked_sdf).exists():
+            rec_data = json.dumps(
+                Path(receptor_pdb).read_text(encoding="utf-8", errors="replace")
+            )
+            sdf_content = Path(docked_sdf).read_text(encoding="utf-8", errors="replace")
+            models = sdf_content.split("$$$$")
+            first_sdf = (models[0].strip() + "\n$$$$\n") if models else ""
+            sdf_data = json.dumps(first_sdf)
+            resi_list = json.dumps([str(r) for r in contact_ids])
+            viewer_id = f"v_{case_id.replace('-', '_').replace('.', '_')}"
+
+            viewer_js = f"""
+<div id="{viewer_id}" style="width:{width}px;height:{height}px;position:relative;"></div>
+<script>
+(function() {{
+  var viewer = $3Dmol.createViewer('{viewer_id}', {{backgroundColor:'white'}});
+  viewer.addModel({rec_data}, 'pdb');
+  viewer.setStyle({{model:0}}, {{cartoon:{{color:'spectrum',opacity:0.75}}}});
+  viewer.addModel({sdf_data}, 'sdf');
+  viewer.setStyle({{model:1}}, {{stick:{{colorscheme:'greenCarbon',radius:0.22}}}});
+  var resi = {resi_list};
+  if (resi.length > 0) {{
+    viewer.addStyle({{model:0,resi:resi}}, {{stick:{{colorscheme:'lightgrayCarbon',radius:0.16}}}});
+  }}
+  viewer.zoomTo({{model:1}});
+  viewer.render();
+}})();
+</script>"""
+        else:
+            viewer_js = (
+                f'<div style="width:{width}px;height:{height}px;background:#f5f5f5;'
+                f'display:flex;align-items:center;justify-content:center;'
+                f'font-size:12px;color:#888;">'
+                f'Files not found</div>'
+            )
+
+        score_html = (
+            f'<div style="font-size:11px;color:#333;padding:4px;'
+            f'max-width:{width}px;overflow:hidden;white-space:pre-wrap;">'
+            f'{score_summary}</div>'
+        ) if score_summary else ""
+
+        cell_blocks.append(
+            f'<div style="display:inline-block;vertical-align:top;'
+            f'margin:8px;border:1px solid #ddd;padding:6px;background:#fff;">'
+            f'<div style="font-weight:bold;font-size:12px;color:#1a237e;'
+            f'margin-bottom:4px;">{case_id}</div>'
+            f'{viewer_js}'
+            f'{score_html}'
+            f'</div>'
+        )
+
+    grid_html = _GRID_TEMPLATE.format(
+        n_cases=len(cases),
+        columns=columns,
+        cells="\n".join(cell_blocks),
+    )
+
+    Path(output_html).parent.mkdir(parents=True, exist_ok=True)
+    Path(output_html).write_text(grid_html, encoding="utf-8")
+    return output_html
+
+
+_GRID_TEMPLATE = """\
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>DAD Docking Grid ({n_cases} cases)</title>
+<script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+<style>
+  body {{ font-family: Arial, sans-serif; background: #f9f9f9; margin: 16px; }}
+  h2 {{ color: #1a237e; }}
+  .grid {{ display: flex; flex-wrap: wrap; gap: 0; }}
+</style>
+</head>
+<body>
+<h2>DAD Docking Overview — {n_cases} pairs</h2>
+<div class="grid">
+{cells}
+</div>
+</body>
+</html>
+"""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Static PNG export
+# ─────────────────────────────────────────────────────────────────────────────
+
+def export_pose_static_png(
+    receptor_pdb: str,
+    docked_sdf: str,
+    output_png: str,
+    contact_residue_ids: List[int],
+    ligand_name: str,
+    width: int = 900,
+    height: int = 600,
+    pose_index: int = 0,
+) -> str:
+    """Generate a static PNG of the docked pose for paper figures.
+
+    Strategy (in order):
+    1. py3Dmol ``view.png()`` — works in Colab with Chrome headless.
+    2. matplotlib 2D contact-distance heatmap fallback (no 3D render needed).
+    3. Last resort: write a companion HTML and return its path with a note.
+    """
+    if not Path(receptor_pdb).exists():
+        raise FileNotFoundError(f"Receptor PDB not found: {receptor_pdb}")
+    if not Path(docked_sdf).exists():
+        raise FileNotFoundError(f"Docked SDF not found: {docked_sdf}")
+
+    Path(output_png).parent.mkdir(parents=True, exist_ok=True)
+
+    # ── Strategy 1: py3Dmol headless render ───────────────────────────────────
+    try:
+        import py3Dmol as _py3dmol
+        from dad.core.interaction import get_sdf_atom_coords
+        import numpy as np
+
+        rec_data = Path(receptor_pdb).read_text(encoding="utf-8", errors="replace")
+        sdf_content = Path(docked_sdf).read_text(encoding="utf-8", errors="replace")
+        models = sdf_content.split("$$$$")
+        idx = min(pose_index, len(models) - 1)
+        sdf_first = models[idx].strip() + "\n$$$$\n"
+
+        view = _py3dmol.view(width=width, height=height)
+        view.addModel(rec_data, "pdb")
+        view.setStyle({"model": 0}, {"cartoon": {"color": "spectrum", "opacity": 0.7}})
+        view.addModel(sdf_first, "sdf")
+        view.setStyle({"model": 1}, {"stick": {"colorscheme": "greenCarbon", "radius": 0.25}})
+        resi = [str(r) for r in contact_residue_ids]
+        if resi:
+            view.addStyle({"model": 0, "resi": resi},
+                          {"stick": {"colorscheme": "lightgrayCarbon", "radius": 0.18}})
+        view.zoomTo({"model": 1})
+        view.rotate(90, "y")
+
+        if hasattr(view, "png"):
+            png_data = view.png()
+            if png_data:
+                import base64
+                raw = png_data.split(",", 1)[-1]
+                Path(output_png).write_bytes(base64.b64decode(raw))
+                return output_png
+    except Exception:
+        pass
+
+    # ── Strategy 2: matplotlib contact-distance heatmap fallback ─────────────
+    try:
+        return _export_contact_heatmap_png(
+            receptor_pdb=receptor_pdb,
+            docked_sdf=docked_sdf,
+            output_png=output_png,
+            contact_residue_ids=contact_residue_ids,
+            ligand_name=ligand_name,
+            pose_index=pose_index,
+            width=width,
+            height=height,
+        )
+    except Exception:
+        pass
+
+    # ── Strategy 3: companion HTML fallback ───────────────────────────────────
+    import warnings
+    companion_html = str(Path(output_png).with_suffix(".html"))
+    warnings.warn(
+        f"export_pose_static_png: neither py3Dmol-png nor matplotlib succeeded. "
+        f"Writing companion HTML to {companion_html}. "
+        f"Open in Chrome/Colab for interactive view.",
+        stacklevel=2,
+    )
+    generate_py3dmol_html(
+        receptor_pdb=receptor_pdb,
+        docked_sdf=docked_sdf,
+        contact_residue_ids=contact_residue_ids,
+        ligand_name=ligand_name,
+        output_html=companion_html,
+        width=width,
+        height=height,
+        pose_index=pose_index,
+    )
+    # write a placeholder PNG with note
+    _write_placeholder_png(output_png, ligand_name, companion_html)
+    return output_png
+
+
+def _export_contact_heatmap_png(
+    receptor_pdb: str,
+    docked_sdf: str,
+    output_png: str,
+    contact_residue_ids: List[int],
+    ligand_name: str,
+    pose_index: int = 0,
+    width: int = 900,
+    height: int = 600,
+) -> str:
+    """Write a matplotlib contact-distance heatmap as PNG fallback."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from dad.core.interaction import get_sdf_atom_coords
+
+    lig_coords = get_sdf_atom_coords(docked_sdf, pose_index)
+    if len(lig_coords) == 0:
+        raise ValueError("No ligand coordinates")
+
+    # collect contact residue atoms from PDB
+    contact_set = set(str(r) for r in contact_residue_ids)
+    residue_atoms: Dict[str, List] = {}
+    for line in Path(receptor_pdb).read_text(errors="replace").splitlines():
+        if not line.startswith("ATOM"):
+            continue
+        try:
+            res_id = line[22:26].strip()
+            if res_id not in contact_set:
+                continue
+            res_name = line[17:20].strip()
+            label = f"{res_name}{res_id}"
+            x, y, z = float(line[30:38]), float(line[38:46]), float(line[46:54])
+            residue_atoms.setdefault(label, []).append([x, y, z])
+        except (ValueError, IndexError):
+            continue
+
+    if not residue_atoms:
+        # nothing to plot — create minimal figure
+        labels = [str(r) for r in contact_residue_ids[:20]]
+        residue_atoms = {lbl: [[0, 0, 0]] for lbl in labels}
+
+    res_labels = sorted(residue_atoms.keys())
+    n_res = len(res_labels)
+    n_lig = len(lig_coords)
+
+    # distance matrix: res × ligand_atom
+    dist_matrix = np.zeros((n_res, n_lig))
+    for i, label in enumerate(res_labels):
+        atoms = np.array(residue_atoms[label])
+        for j, lc in enumerate(lig_coords):
+            dist_matrix[i, j] = float(np.min(np.linalg.norm(atoms - lc, axis=1)))
+
+    dpi = 100
+    fig_w = max(6, min(n_lig * 0.4, width / dpi))
+    fig_h = max(4, min(n_res * 0.35, height / dpi))
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
+    im = ax.imshow(dist_matrix, aspect="auto", cmap="RdYlGn_r", vmin=0, vmax=8)
+    ax.set_xticks(range(n_lig))
+    ax.set_xticklabels([f"A{j+1}" for j in range(n_lig)], fontsize=7, rotation=60)
+    ax.set_yticks(range(n_res))
+    ax.set_yticklabels(res_labels, fontsize=8)
+    ax.set_xlabel("Ligand atom", fontsize=9)
+    ax.set_ylabel("Contact residue", fontsize=9)
+    ax.set_title(f"Contact distances — {ligand_name} (pose {pose_index})", fontsize=10)
+    fig.colorbar(im, ax=ax, label="Distance (Å)")
+    fig.tight_layout()
+    fig.savefig(output_png, dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+    return output_png
+
+
+def _write_placeholder_png(output_png: str, ligand_name: str, companion_html: str) -> None:
+    """Write a minimal white-with-text PNG when no render is available."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(figsize=(4, 2), dpi=72)
+        ax.axis("off")
+        ax.text(0.5, 0.6, f"PNG export pending — {ligand_name}",
+                ha="center", va="center", fontsize=10)
+        ax.text(0.5, 0.35, f"Open {Path(companion_html).name} in browser",
+                ha="center", va="center", fontsize=8, color="#555")
+        fig.savefig(output_png, dpi=72, bbox_inches="tight")
+        plt.close(fig)
+    except Exception:
+        Path(output_png).write_bytes(b"")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2D interaction map (RDKit + matplotlib)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def generate_2d_interaction_map(
+    docked_sdf: str,
+    contact_residue_labels: List[str],
+    contact_distances: List[float],
+    output_png: str,
+    pose_index: int = 0,
+    width: int = 800,
+    height: int = 600,
+) -> str:
+    """RDKit 2D ligand depiction + contact residue bar chart.
+
+    Left panel: RDKit Chem.Draw 2D ligand structure.
+    Right panel: horizontal bar chart of residue labels sorted by distance.
+    Bars coloured by distance (green < 3 Å, yellow 3-4 Å, orange > 4 Å).
+
+    Falls back to a text-only PNG when RDKit or matplotlib is unavailable.
+    """
+    if not Path(docked_sdf).exists():
+        raise FileNotFoundError(f"Docked SDF not found: {docked_sdf}")
+
+    Path(output_png).parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import numpy as np
+    except ImportError:
+        import warnings
+        warnings.warn(
+            "generate_2d_interaction_map: matplotlib not available — writing text fallback.",
+            stacklevel=2,
+        )
+        txt_path = str(Path(output_png).with_suffix(".txt"))
+        Path(txt_path).write_text(
+            "\n".join(f"{lbl}: {d:.2f} Å" for lbl, d in
+                      zip(contact_residue_labels, contact_distances)),
+            encoding="utf-8",
+        )
+        return txt_path
+
+    # ── RDKit 2D ligand depiction ─────────────────────────────────────────────
+    lig_img = None
+    try:
+        from rdkit import Chem
+        from rdkit.Chem.Draw import rdMolDraw2D
+        from PIL import Image
+        import io
+
+        sdf_text = Path(docked_sdf).read_text(encoding="utf-8", errors="replace")
+        models = sdf_text.split("$$$$")
+        idx = min(pose_index, len(models) - 1)
+        mol_block = models[idx].strip() + "\n$$$$\n"
+        suppl = Chem.SDMolSupplier()
+        suppl.SetData(mol_block)
+        mol = next((m for m in suppl if m is not None), None)
+        if mol is not None:
+            mol = Chem.RemoveHs(mol)
+            draw_w, draw_h = 380, height - 40
+            drawer = rdMolDraw2D.MolDraw2DSVG(draw_w, draw_h)
+            drawer.drawOptions().addStereoAnnotation = True
+            drawer.DrawMolecule(mol)
+            drawer.FinishDrawing()
+            svg = drawer.GetDrawingText()
+            # convert SVG → PIL image via cairosvg if available, else skip
+            try:
+                import cairosvg
+                png_bytes = cairosvg.svg2png(bytestring=svg.encode(), output_width=draw_w)
+                lig_img = Image.open(io.BytesIO(png_bytes))
+            except Exception:
+                lig_img = None
+    except Exception:
+        lig_img = None
+
+    # ── Build figure ──────────────────────────────────────────────────────────
+    dpi = 100
+    fig_w = width / dpi
+    fig_h = height / dpi
+
+    if lig_img is not None:
+        fig, (ax_lig, ax_bar) = plt.subplots(
+            1, 2, figsize=(fig_w, fig_h), dpi=dpi,
+            gridspec_kw={"width_ratios": [2, 3]}
+        )
+        ax_lig.imshow(lig_img)
+        ax_lig.axis("off")
+        ax_lig.set_title("2D Structure", fontsize=9)
+    else:
+        fig, ax_bar = plt.subplots(1, 1, figsize=(fig_w * 0.65, fig_h), dpi=dpi)
+
+    # ── Contact bar chart ─────────────────────────────────────────────────────
+    if contact_residue_labels and contact_distances:
+        paired = sorted(
+            zip(contact_residue_labels, contact_distances),
+            key=lambda x: x[1],
+        )
+        labels_sorted = [p[0] for p in paired]
+        dists_sorted = [p[1] for p in paired]
+        colors = [
+            "#2e7d32" if d < 3.0 else ("#f9a825" if d < 4.0 else "#e64a19")
+            for d in dists_sorted
+        ]
+        y_pos = list(range(len(labels_sorted)))
+        ax_bar.barh(y_pos, dists_sorted, color=colors, height=0.6, edgecolor="white")
+        ax_bar.set_yticks(y_pos)
+        ax_bar.set_yticklabels(labels_sorted, fontsize=8)
+        ax_bar.set_xlabel("Min. distance to ligand (Å)", fontsize=9)
+        ax_bar.axvline(x=3.0, color="#2e7d32", linestyle="--", linewidth=0.8, alpha=0.7)
+        ax_bar.axvline(x=4.0, color="#f9a825", linestyle="--", linewidth=0.8, alpha=0.7)
+        ax_bar.set_xlim(0, max(dists_sorted) * 1.1 + 0.5)
+        ax_bar.invert_yaxis()
+        ax_bar.set_title("Contact residues", fontsize=9)
+
+        # legend patches
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor="#2e7d32", label="< 3 Å (close)"),
+            Patch(facecolor="#f9a825", label="3–4 Å"),
+            Patch(facecolor="#e64a19", label="> 4 Å"),
+        ]
+        ax_bar.legend(handles=legend_elements, fontsize=7, loc="lower right")
+    else:
+        ax_bar.text(0.5, 0.5, "No contact residues provided",
+                    ha="center", va="center", fontsize=10, transform=ax_bar.transAxes)
+        ax_bar.axis("off")
+
+    fig.suptitle(
+        f"Interaction map — {Path(docked_sdf).stem} (pose {pose_index})",
+        fontsize=10, y=1.01,
+    )
+    fig.tight_layout()
+    fig.savefig(output_png, dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+    return output_png
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Project-level HTML report
 # ─────────────────────────────────────────────────────────────────────────────
 

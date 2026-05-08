@@ -43,7 +43,7 @@ Software development and manuscript drafting were assisted by large-language-mod
 - All artifact paths and SHA-256 checksums in the corresponding manifest.json files.
 
 ## Conditional disclosures (Codex Round 6 unsafe-claim ban list compliance)
-- Supporting primary paper status: peer-reviewed and published in *iScience* 2026 (Sung J-Y et al.; PII S2589-0042(26)01130-2; DOI 10.1016/j.isci.2026.<article_id>; URL https://www.cell.com/iscience/fulltext/S2589-0042(26)01130-2). Nature Protocols' supporting-research-paper requirement is satisfied.
+- Supporting primary paper status: peer-reviewed and published in *iScience* 2026 (Sung J-Y et al.; PII S2589-0042(26)01130-2; DOI 10.1016/j.isci.2026.115755; URL https://www.cell.com/iscience/fulltext/S2589-0042(26)01130-2). Nature Protocols' supporting-research-paper requirement is satisfied.
 - Tier 2 ~ 60-pair generalisation: not completed (planned Phase D / companion-study scope).
 - Decoy / enrichment evaluation: not completed (enrichment_metrics.py implemented; dataset run is Phase D).
 - Live HTML / .cxc pose visualisation: not produced (Mr_Dock + DAD_protocol.ipynb §11 deliverable).

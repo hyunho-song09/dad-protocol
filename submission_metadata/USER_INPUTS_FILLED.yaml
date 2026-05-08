@@ -11,14 +11,14 @@ primary_paper:
   publisher: "Cell Press / Elsevier"
   year: 2026
   pii: "S2589-0042(26)01130-2"
-  doi_format: "10.1016/j.isci.2026.<article_id>"
-  doi: "[USER_VERIFY: see iScience landing page for exact DOI; PII S2589-0042(26)01130-2 maps to DOI of form 10.1016/j.isci.2026.NNNNNN]"
+  doi_format: "10.1016/j.isci.2026.115755"
+  doi: "10.1016/j.isci.2026.115755"
   url: "https://www.cell.com/iscience/fulltext/S2589-0042(26)01130-2"
   title: "Keratin degradation reflects a starvation survival strategy in Fervidobacterium islandicum AW-1"
   full_citation: "Sung J-Y, Kim J-Y, Jin H-S, Baek J-H, Kim NE, Song HH, Bong S-H, Lee Y-J, Kim B-C, Lee DY, Lee D-W. Keratin degradation reflects a starvation survival strategy in Fervidobacterium islandicum AW-1. iScience. 2026 (Cell Press); PII S2589-0042(26)01130-2."
   authors_short: "Sung et al. 2026"
   bibtex_key: "Sung2026KeratinStarvationFI"
-  figure_or_supplement_ref: "iScience supplementary material (Reviewer #2 docking validation, integrated in published version); the six docking ground-truth values used as DAD's Tier 1 replay regression set are reproduced verbatim in Claude_web/Revision.txt and validated in Publication/supplementary/SI_data/SI_data_tier1_replay.tsv. Exact figure/table number to be confirmed by user against published iScience version."
+  figure_or_supplement_ref: "iScience supplementary material (Reviewer #2 docking validation, integrated in published version); the six docking ground-truth values used as DAD's Tier 1 replay regression set are reproduced verbatim in Claude_web/Revision.txt and validated in Publication/supplementary/SI_data/SI_data_tier1_replay.tsv. Confirmed: Table S5 and Figure S10 of the published iScience version (corresponding author 2026-05-08)."
   relationship_to_DAD: "DAD is the methodological packaging of the protein–metabolite docking analysis used in Sung et al. iScience 2026 (chemotaxis-linked persister-like adaptation section). Tier 1 of DAD reproduces this primary paper's docking values to bit-equal accuracy (all Δ = 0). The peer-reviewed acceptance of the primary paper satisfies Nature Protocols' supporting-research-paper requirement."
   paper_status_for_DAD_submission: "Mode B (full Nature Protocols submission) — primary paper is peer-reviewed and published in iScience 2026, satisfying Nature Protocols' supporting primary paper requirement. The earlier 'conditional / presubmission-enquiry' framing in codex Round 6 was based on the bioRxiv preprint stage; that conditional is now lifted."
 

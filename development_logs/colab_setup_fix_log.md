@@ -39,3 +39,43 @@ After Colab reconnects, the user should run all cells again. On the second run, 
 - Raw protein sequences without FASTA headers are accepted as `Protein_1`.
 - Raw SMILES without `name:` prefixes are accepted as `Ligand_1`.
 - Step-level progress bars were added throughout the notebook.
+
+## 2026-05-08: ColabFold installed without AlphaFold extras
+
+### User-facing symptom
+
+`3. Structure Input or Prediction` failed in Colab with:
+
+```text
+ModuleNotFoundError: No module named 'alphafold'
+RuntimeError: alphafold is not installed. Please run `pip install colabfold[alphafold]`
+```
+
+### Root cause
+
+The notebook only checked whether the `colabfold_batch` executable existed. In the failing Colab runtime, `colabfold_batch` existed but the optional `alphafold` dependency was missing.
+
+### Fix
+
+The setup and structure cells now treat ColabFold as ready only when both conditions are true:
+
+- `colabfold_batch` is available;
+- the Python module `alphafold` is importable.
+
+If either condition fails, the notebook installs:
+
+```bash
+pip install -q "colabfold[alphafold]"
+```
+
+The structure cell writes installation diagnostics to:
+
+```text
+WORK_DIR/structures/colabfold_install.log
+```
+
+and ColabFold run diagnostics to:
+
+```text
+WORK_DIR/structures/colabfold.log
+```

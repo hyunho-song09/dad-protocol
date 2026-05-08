@@ -135,3 +135,38 @@ The ESMFold public API can reject long requests. The previous ColabFold block wa
 - The notebook applies the TensorFlow `.so` cleanup from the reference AlphaFold2 notebook before ColabFold import.
 - AF2 quality controls were added: `AF2_PRESET`, `AF2_MODEL_TYPE`, `AF2_NUM_RECYCLES`, `AF2_NUM_MODELS`, `AF2_NUM_SEEDS`, and `AF2_RELAX_TOP_N`.
 - If `AF2_RELAX_TOP_N > 0`, the structure step installs OpenMM/PDBFixer via mamba before AMBER relaxation.
+
+
+## 2026-05-08: AF3-default + AF2-option structure prediction
+
+### User-facing change
+
+`STRUCTURE_MODE` now defaults to `"af3_results"` instead of `"auto"`. The notebook now has two structure cells:
+
+- **§3a (new default):** Loads AlphaFold 3 CIF results from a user-specified folder (`AF3_RESULTS_PATH`) or a Colab ZIP upload. Parses per-model confidence JSON (ipTM, pTM, mean pLDDT, ranking_score), converts CIF → PDB via Bio.PDB / gemmi fallback, and renders a per-residue pLDDT bar chart with 70 / 90 threshold lines.
+- **§3b (optional):** Retains the full AF2 / ESMFold / user_pdb path from previous codex commits. Skipped automatically when all structures are already loaded by §3a.
+
+### STRUCTURE_MODE options (5)
+
+| Value | Meaning |
+|---|---|
+| `af3_results` | Load CIF results from AF3 Server or local AF3 install (new default) |
+| `auto` | Try cache/upload → ESMFold API → ColabFold AF2 |
+| `user_pdb` | Upload or paste a PDB file directly |
+| `esmfold_api` | ESMFold public API (≤ 400 aa) |
+| `colabfold_af2` | ColabFold AF2 in-notebook prediction |
+
+### New Colab Form params (§3a)
+
+- `AF3_RESULTS_PATH` — path to the AF3 job folder (string, empty = Colab upload prompt)
+- `AF3_USE_TOP_RANKED` — `True` uses model_0 only; `False` loads all 5 models and picks highest ranking_score
+
+### Codex fixes preserved
+
+All 7 prior codex fixes were preserved intact in §3b: RESTART_REQUESTED condacolab pattern, TF `.so` cleanup (`patch_tensorflow_for_colabfold()`), `ensure_colabfold_ready()` with `colabfold[alphafold-minus-jax]`, `apply_af2_preset()`, `ensure_amber_ready()`, `AF2_RELAX_TOP_N`, and the ESMFold 413 fallback chain.
+
+### Files updated
+
+- `Publication/DAD_protocol.ipynb`
+- `Publication/code/notebooks/DAD_protocol.ipynb`
+- `Publication/code/README.md`

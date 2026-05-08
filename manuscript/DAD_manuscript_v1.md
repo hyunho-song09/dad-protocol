@@ -151,6 +151,8 @@ Tier 1 inputs are pre-supplied at `01_Tier1_input/proteins/*.fasta` and `01_Tier
 
 Three frozen execution paths are documented in `06_Report/Mr_Pipeline/runtime_freeze.md`. The primary verified path is WSL2 + Ubuntu 24.04 with the project-local CUDA / cuDNN runtime. After cloning the repository and installing the conda environment from `06_Report/Mr_Repro/environment-lite.yml`, run `bash 06_Report/Mr_Repro/tools/gnina/run_gnina_wsl.sh --version` to verify GNINA loads. The Colab path uses `!pip install nvidia-{cuda-runtime,cublas,cusparse,cufft,cusolver,cudnn,nvtx}-cu12` followed by `LD_LIBRARY_PATH` injection (template cells in `Mr_Pipeline/colab/dad_run.ipynb`). The HPC path uses `06_Report/Mr_Repro/container-hpc/Dockerfile` to build an Apptainer image. Pinned versions are in `runtime_freeze.md` §1 and `06_Report/Mr_Repro/tools/gnina_runtime/MANIFEST.md`. Snakemake (≥ 8.0) and DeepTMHMM (`biolib` CLI) are installed from the conda environment; Phobius is an opt-in alternative requiring the user's own academic license install.
 
+**Stage 4 structure-prediction backend.** The default backend is **AlphaFold 3** (Abramson et al., *Nature* 2024). Two delivery modes are supported and DAD parses either: (i) the free AlphaFold Server at https://alphafoldserver.com (academic use; the per-day quota documented by the server, currently approximately 50 jobs/day, caps batch throughput); (ii) a user-installed copy of the AlphaFold 3 codebase from https://github.com/google-deepmind/alphafold3 (model weights are released by Google DeepMind under restricted academic access; users obtain weights through the DeepMind weights-request channel and install them locally). The protocol does **not** redistribute AlphaFold 3 weights. Alternative backends supported by DAD's `dad.core.structure` loader: AlphaFold 2 / ColabFold v1.6.1 (Mirdita et al. 2022; Jumper et al. 2021) for higher-throughput batch runs that fit a free Colab T4 quota, and ESMFold (Lin et al. 2023) as a short-protein fallback when an MSA is not available.
+
 ---
 
 ## 7. Procedure (with Timing) — *target ≈ 1500 words; 12 stages, 43 numbered steps*
@@ -164,7 +166,7 @@ Sources: Tier 1 replay = `06_Report/Mr_Repro/benchmark/run_replay.py` on a Windo
 | 1 | 1–3 | Input ingestion | < 1 s | < 1 s | TSV load + schema check |
 | 2 | 4–6 | Sequence QC + dereplication (MMseqs2) | n/a | < 30 s for ≤ 10 sequences (estimated) | MMseqs2 default identity ≥ 0.95 |
 | 3 | 7–10 | Pre-docking biological triage | < 1 s (rule application) | ~ 30–60 s/protein incl. DeepTMHMM cloud call (estimated) | Rules R1–R5 are O(1); DeepTMHMM dominates |
-| 4 | 11–15 | Structure prediction (ColabFold or AF DB; AF3/Boltz-1 alt) | 0 s (AW1_ref reuse) | 0 s (RCSB receptor reuse) | Live forward run estimated 5–15 min/protein on Colab T4 |
+| 4 | 11–15 | Structure prediction (**AlphaFold 3 default** via AlphaFold Server or local install; AlphaFold 2 / ColabFold or ESMFold alt) | 0 s (AW1_ref reuse) | 0 s (RCSB receptor reuse) | Live forward run: AF3 typically returns 5 ranked models within minutes on AlphaFold Server (server-side compute; subject to per-day quota). AF2 / ColabFold T4 estimate: 5–15 min/protein. |
 | 5 | 16–18 | Pocket detection (P2Rank) | 0 s (CSV reuse) | n/a (R5 used crystal centres) | ~ 30 s/structure (estimated) |
 | 6 | 19–22 | Ligand preparation (RDKit + Open Babel) | < 1 s/ligand | < 1 s/ligand | RDKit 3D embed + MMFF94 |
 | 7 | 23–25 | Auto-box configuration | < 1 s/case | < 1 s/case | 22 Å min exercised on all 16 R5 cases |
@@ -185,8 +187,15 @@ Sources: Tier 1 replay = `06_Report/Mr_Repro/benchmark/run_replay.py` on a Windo
 ### Pause Points
 
 - After Stage 3 (review `triage_report.tsv` before consuming GPU on Stage 4).
-- After Stage 4 (inspect pLDDT median; flag < 70).
+- After Stage 4 (inspect predicted Confidence per ranked model; for AlphaFold 3, use the iPTM / pLDDT JSON metrics returned alongside each PDB; for AlphaFold 2 / ColabFold, flag pLDDT median < 70).
 - After Stage 8 (inspect raw docking results; check the top-1 vs best-of-9 column ratio per case).
+
+### Stage 4 backend — operating instructions
+
+- **AlphaFold 3 via AlphaFold Server (default).** Submit each FASTA in `01_Tier1_input/proteins/` to https://alphafoldserver.com (academic free use; subject to a per-day quota). After the server completes a job, download the `fold_<job_id>.zip` archive containing the 5 ranked PDBs plus per-model metrics, place the unzipped folder under `06_Report/Mr_Repro/external_validation/<protein_id>/` (or any path of the user's choice), and point DAD's loader at that directory: `dad.core.structure.load_af3_all_models(af3_results_path)`. Stage 5 (P2Rank) then consumes the ranked PDB(s) directly. The protocol does **not** redistribute the AlphaFold Server outputs; users keep them in their own environment.
+- **AlphaFold 3 via local install (alternative).** Clone https://github.com/google-deepmind/alphafold3, obtain the AlphaFold 3 model weights via the DeepMind academic-access channel, and install per the upstream README. The same `dad.core.structure.load_af3_all_models()` loader handles the local-install output schema.
+- **AlphaFold 2 via ColabFold v1.6.1 (alternative for higher-throughput batches).** Run `colabfold_batch <fasta> <out_dir> --num-recycle 3` either in the user's Colab notebook or locally; DAD's loader (`load_colabfold_pdb`) consumes the ranked PDBs and per-model pLDDT JSON.
+- **ESMFold via API (short-protein fallback).** When an MSA is not available or the protein is short, `dad.core.structure.load_esmfold_pdb` queries the ESMFold inference API and returns a single PDB; subsequent stages are unchanged.
 
 The full numbered step list (steps 1–43) is given in Supplementary Information §SI-Procedure.
 
@@ -276,11 +285,15 @@ The 16-case benchmark verifies pose recovery on co-crystallised pairs. It does n
 
 This manuscript explicitly does **not** claim the protocol is "fully validated"; Tier-2 ~60-pair benchmark is **not completed** (planned Phase D); decoy / enrichment evaluation is **not completed**; best-of-9 is **not** presented as a prospective operational metric; and exact bitwise score identity across GPU architectures is not assumed (comparable scores within tolerance only). The supporting primary paper requirement is satisfied (Sung J-Y et al., *iScience* 2026, peer-reviewed published).
 
+### 10.5 AlphaFold 3 access constraint
+
+AF3 weights are released by Google DeepMind under restricted academic access; the protocol uses either the (free, web-based) AlphaFold Server output or a user-installed copy of the AlphaFold 3 codebase (https://github.com/google-deepmind/alphafold3). AlphaFold Server's per-day quota (~50 jobs) caps batch throughput; for high-throughput campaigns, ColabFold AF2 is the recommended alternative.
+
 ---
 
 ## 11. Reporting summary — *target ≈ 200 words*
 
-- **Software versions**: ColabFold ≥ 1.6.1, GNINA 1.3.2 (`master:f23dd2b`), P2Rank ≥ 2.4, DeepTMHMM v1.0.24, RDKit 2024.09+, Open Babel 3.1+, PLIP 2.3+, MMseqs2 release_15, Snakemake ≥ 8.0. Pinned versions in `runtime_freeze.md` §1 and `tools/gnina_runtime/MANIFEST.md`.
+- **Software versions**: AlphaFold 3 (default Stage 4 backend; AlphaFold Server https://alphafoldserver.com or local install https://github.com/google-deepmind/alphafold3), AlphaFold 2 / ColabFold ≥ 1.6.1 (alternative), ESMFold (short-protein fallback), GNINA 1.3.2 (`master:f23dd2b`), P2Rank ≥ 2.4, DeepTMHMM v1.0.24, RDKit 2024.09+, Open Babel 3.1+, PLIP 2.3+, MMseqs2 release_15, Snakemake ≥ 8.0. Pinned versions in `runtime_freeze.md` §1 and `tools/gnina_runtime/MANIFEST.md`.
 - **Database versions**: BindingDB (date-stamped at user run), BioLiP2 (weekly snapshot), CrossDocked2020 (Zenodo DOI 10.5281/zenodo.4045263), ChEMBL release N, AlphaFold DB (date), HMDB (date; CC BY-NC 4.0 flag), MetaboLights (date), RCSB PDB (CC0).
 - **Random seeds**: GNINA `seed = 0`, `exhaustiveness = 32`, `num_modes = 9` (defaults).
 - **Hardware**: GPU model + driver + CUDA version recorded in `gnina_environment_check.json` and `manifest.json`.

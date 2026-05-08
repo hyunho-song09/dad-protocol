@@ -13,7 +13,7 @@
 | Introduction §1.2 | McNutt2025 | GNINA standalone |
 | Introduction §1.2 | Krishna2024RFAA | RFAA cofolding |
 | Introduction §1.2 | Wohlwend2024Boltz | Boltz-1 cofolding |
-| Introduction §1.2 | Abramson2024 | AlphaFold 3 cofolding |
+| Introduction §1.2 | Abramson2024AlphaFold3 | AlphaFold 3 cofolding |
 | Introduction §1.2 | Stark2022EquiBind | EquiBind regression |
 | Introduction §1.2 | Hekkelman2022AlphaFill | AlphaFill ligand transplant |
 | Introduction §1.3 | Mirdita2022 | ColabFold |
@@ -34,7 +34,10 @@
 | Experimental design §5.5 | (no external citation; runtime_freeze.md) | — |
 | Materials §6.4 | Hallgren2022DeepTMHMM | DeepTMHMM install |
 | Materials §6.4 | Kall2007Phobius | Phobius opt-in |
-| Procedure §7 (Stage 4) | Mirdita2022, Jumper2021, Abramson2024, Wohlwend2024Boltz | structure-prediction options |
+| Materials §6.4 | Abramson2024AlphaFold3 | **AlphaFold 3 default Stage 4 backend** (Server / local install) |
+| Materials §6.4 | Mirdita2022, Jumper2021 | AlphaFold 2 / ColabFold alternative backend |
+| Materials §6.4 | Lin2023ESMFold | ESMFold short-protein fallback backend |
+| Procedure §7 (Stage 4) | Abramson2024AlphaFold3 (default), Mirdita2022, Jumper2021, Lin2023ESMFold, Wohlwend2024Boltz | structure-prediction options |
 | Procedure §7 (Stage 5) | Krivak2018 | P2Rank |
 | Procedure §7 (Stage 8) | McNutt2025 | GNINA 1.3 default |
 | Procedure §7 (Stage 9) | Adasme2021PLIP, Hamelryck2003BioPDB | interaction profiling |
@@ -45,7 +48,8 @@
 | Limitations §10.1 | McNutt2025, Francoeur2020 | within-case CNN ranking limitation |
 | Limitations §10.2 | Francoeur2020 | CrossDocked2020 training-distribution bias |
 | Limitations §10.3 | Buttenschoen2024 | PoseBusters validity |
-| Reporting summary §11 | (all software refs above) | — |
+| Limitations §10.5 | Abramson2024AlphaFold3 | AlphaFold 3 weights restricted-access constraint + AlphaFold Server quota |
+| Reporting summary §11 | Abramson2024AlphaFold3, Mirdita2022, Jumper2021, Lin2023ESMFold (+ all software refs above) | Stage 4 backend list |
 
 ## Supplementary section → BibTeX key map
 
@@ -66,7 +70,7 @@
 
 ## Coverage check
 
-- All 33 BibTeX entries currently in `references.bib` are cited at least once above.
+- All 34 BibTeX entries currently in `references.bib` are cited at least once above (33 prior + 1 new `Lin2023ESMFold` added 2026-05-08; key `Abramson2024` renamed to `Abramson2024AlphaFold3` to surface the AF3 default-backend role).
 - The five SI-Methods placeholders are now resolved with team-lead-selected citations: `Kall2007Phobius`, `Hallgren2022DeepTMHMM`, `Krell2011Diversity`, `DrewBoudker2016Transporters`, `Briegel2014ChemoreceptorArchitecture`. (User-input form 2026-05-08.)
 - `Sung2026KeratinStarvationFI` (iScience 2026, Cell Press; PII S2589-0042(26)01130-2) replaces `PrimaryPaperPlaceholder`. Status: peer-reviewed and published; Nature Protocols' supporting-research-paper requirement satisfied.
 
@@ -88,5 +92,5 @@
 | **Body unique total** | ~ 22 (after deduplication) |
 | **+ SI-Methods unique** | + 5 (Kall2007Phobius, Hallgren2022DeepTMHMM, Krell2011Diversity, DrewBoudker2016Transporters, Briegel2014ChemoreceptorArchitecture) |
 | **+ Supporting primary** | + 1 (Sung2026KeratinStarvationFI) |
-| **Total in `references.bib`** | **33 entries** |
+| **Total in `references.bib`** | **34 entries** (incl. Lin2023ESMFold added 2026-05-08) |
 | **Submission target** | 25–30 references (Nature Protocols typical range) — final pruning at submission |

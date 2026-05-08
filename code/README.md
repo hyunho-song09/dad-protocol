@@ -2,27 +2,39 @@
 
 [Open the Colab notebook](https://colab.research.google.com/github/hyunho-song09/dad-protocol/blob/main/DAD_protocol.ipynb)
 
+## Two-Phase Workflow
+
+| Phase | Steps | Input | Output |
+|---|---|---|---|
+| **Phase A** — Structure prep (run once) | §0–4 | Multi-FASTA | PDB + pocket cache, `structure_registry.tsv` |
+| **Phase B** — Selective ligand scoring | §5–10 | Multi-SMILES + widget selection | `docking_master.csv`, heatmap |
+
 ## What It Does
 
 | Stage | Description |
 |---|---|
-| Input | Accepts raw protein sequences or FASTA; raw SMILES or `name:SMILES` |
-| Triage | Filters by length, signal-peptide clipping, TM-helix count, dock-region length, and functional class |
-| Structure | Accepts AlphaFold 3 results (default; from alphafoldserver.com or local install) or, optionally, predicts via ESMFold API or ColabFold AF2 |
-| Pocket | P2Rank binding-site prediction |
-| Docking | GNINA scoring with per-pose CNN affinity |
-| Export | Ranked TSV with ipTM / pTM / pLDDT / CNN-affinity columns |
+| Input (Phase A) | Multi-FASTA; raw sequences auto-named Protein_1, Protein_2, ... |
+| Structure (Phase A) | `colabfold_batch` multi-FASTA CLI (default, `--num-models 1 --num-recycle 3 --sort-queries-by length`); or ingest AF3 Server CIF results; or ESMFold API; or user PDB |
+| Pocket (Phase A) | P2Rank batch on all proteins in structure_registry |
+| Input (Phase B) | Multi-SMILES (`name:SMILES` per line); SHA-keyed SDF cache |
+| Selection (Phase B) | ipywidgets multi-select: choose protein subset × ligand subset |
+| Docking (Phase B) | GNINA cross-product of selected pairs only; cache-hit pairs skipped |
+| Export | `docking_master.csv` (append-only), ranked table, CNN-affinity heatmap |
 
 ## User Workflow
 
-1. Paste protein sequence or FASTA.
-2. Paste SMILES or `name:SMILES`.
-3. Run triage.
-4. Triage done — run structure step.
-5a. (Preferred) Download AF3 results from alphafoldserver.com, set `STRUCTURE_MODE = "af3_results"`, enter the folder path in `AF3_RESULTS_PATH`.
-5b. (Alternative) Set `STRUCTURE_MODE` to `esmfold_api` or `colabfold_af2` for in-notebook prediction.
-6. Run GNINA.
-7. Export ranked TSV results.
+**Phase A (run once per protein set):**
+1. §1 Paste multi-FASTA sequences.
+2. §2 Set `STRUCTURE_MODE = "colabfold_af2"` (default) or `"af3_results"` if you have AlphaFold Server results.
+3. §3–4 P2Rank pocket detection + `structure_registry.tsv` summary.
+
+**Phase B (repeat with new SMILES or new subset):**
+4. §5 Paste SMILES (`name:SMILES` per line).
+5. §6 Select proteins and ligands in the widget UI.
+6. §7 Click **Run docking on selection**.
+7. §8 Export `docking_master.csv`.
+
+Re-running Phase B with new SMILES does **not** re-run Phase A.
 
 ## Install
 

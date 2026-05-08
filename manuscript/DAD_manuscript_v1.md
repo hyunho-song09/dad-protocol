@@ -151,53 +151,68 @@ Tier 1 inputs are pre-supplied at `01_Tier1_input/proteins/*.fasta` and `01_Tier
 
 Three frozen execution paths are documented in `06_Report/Mr_Pipeline/runtime_freeze.md`. The primary verified path is WSL2 + Ubuntu 24.04 with the project-local CUDA / cuDNN runtime. After cloning the repository and installing the conda environment from `06_Report/Mr_Repro/environment-lite.yml`, run `bash 06_Report/Mr_Repro/tools/gnina/run_gnina_wsl.sh --version` to verify GNINA loads. The Colab path uses `!pip install nvidia-{cuda-runtime,cublas,cusparse,cufft,cusolver,cudnn,nvtx}-cu12` followed by `LD_LIBRARY_PATH` injection (template cells in `Mr_Pipeline/colab/dad_run.ipynb`). The HPC path uses `06_Report/Mr_Repro/container-hpc/Dockerfile` to build an Apptainer image. Pinned versions are in `runtime_freeze.md` §1 and `06_Report/Mr_Repro/tools/gnina_runtime/MANIFEST.md`. Snakemake (≥ 8.0) and DeepTMHMM (`biolib` CLI) are installed from the conda environment; Phobius is an opt-in alternative requiring the user's own academic license install.
 
-**Stage 4 structure-prediction backend.** The default backend is **AlphaFold 3** (Abramson et al., *Nature* 2024). Two delivery modes are supported and DAD parses either: (i) the free AlphaFold Server at https://alphafoldserver.com (academic use; the per-day quota documented by the server, currently approximately 50 jobs/day, caps batch throughput); (ii) a user-installed copy of the AlphaFold 3 codebase from https://github.com/google-deepmind/alphafold3 (model weights are released by Google DeepMind under restricted academic access; users obtain weights through the DeepMind weights-request channel and install them locally). The protocol does **not** redistribute AlphaFold 3 weights. Alternative backends supported by DAD's `dad.core.structure` loader: AlphaFold 2 / ColabFold v1.6.1 (Mirdita et al. 2022; Jumper et al. 2021) for higher-throughput batch runs that fit a free Colab T4 quota, and ESMFold (Lin et al. 2023) as a short-protein fallback when an MSA is not available.
+**Stage 4 structure-prediction backend (Phase A).** The default backend is **AlphaFold 2 via ColabFold v1.6.1** (Jumper et al. 2021; Mirdita et al. 2022), invoked **once per Phase A run** as a `colabfold_batch` multi-FASTA call with the conservative settings `--num-models 1 --num-recycle 3 --sort-queries-by length --msa-mode mmseqs2_uniref_env --zip` (rationale and an optional `--num-relax 0 --templates 0` fast-preview toggle are in `Publication/development_logs/two_phase_architecture_plan.md` §2). This setting profile produces one rank-1 PDB per protein and re-uses the JAX/XLA compilation cache via length-sorted queries, which is the largest single contributor to throughput on a single Colab GPU. **AlphaFold 3** (Abramson et al. 2024) is supported as an *alternative*: DAD's loader consumes pre-computed output from the AlphaFold Server (https://alphafoldserver.com; free academic use; per-day quota currently approximately 50 jobs caps batch throughput) or from a user-installed copy of the AlphaFold 3 codebase (https://github.com/google-deepmind/alphafold3; weights released by Google DeepMind under restricted academic access). The protocol does **not** redistribute AlphaFold 3 weights or AlphaFold Server output. Direct AF3 invocation from inside a Colab notebook is currently impractical for the protocol's user persona; AF2 / ColabFold is therefore the verified default. **ESMFold** (Lin et al. 2023) is a short-protein fallback when an MSA is not available.
 
 ---
 
-## 7. Procedure (with Timing) — *target ≈ 1500 words; 12 stages, 43 numbered steps*
+## 7. Procedure (with Timing) — *target ≈ 1500 words; two-phase, 12 stages, 44 numbered steps*
 
-### Table 3. Stage-level timing (measured)
+The protocol is split into two phases that match the user's data shape: a **ligand-independent Phase A** that prepares one structure and pocket per protein, and a **ligand-selective Phase B** that scores user-chosen protein × ligand subsets. Phase A is run **once** for a given multi-FASTA input and its outputs (`structure_registry.tsv`) are cached and re-used; Phase B is run **as many times as the user has subsets to evaluate**, and pairs already scored are skipped via the case-id cache (`development_logs/two_phase_architecture_plan.md` §3). The Tier 1 worked example uses three FASTA × two SMILES = at most six pairs; a real metabolomics campaign will typically have *N* proteins (Phase A run once) × subsets of *M* SMILES (Phase B runs many times).
 
-Sources: Tier 1 replay = `06_Report/Mr_Repro/benchmark/run_replay.py` on a Windows host (no GPU); RCSB seed = Codex Round 5, RTX 2060 12 GiB / WSL Ubuntu 24.04; ColabFold and P2Rank cells flagged **(estimated)** are based on published-tool benchmarks.
+### Table 3. Stage-level timing (measured), grouped by phase
+
+Sources: Tier 1 replay = `06_Report/Mr_Repro/benchmark/run_replay.py` on a Windows host (no GPU); RCSB seed = Codex Round 5, RTX 2060 12 GiB / WSL Ubuntu 24.04; AF2 / ColabFold and P2Rank cells flagged **(estimated)** are based on published-tool benchmarks. Phase A scales with *N* proteins (sequence-only); Phase B scales with the *selected* subset of pairs *N′ × M′ ≤ N × M*.
+
+**Phase A — Structure preparation (Stages 0–5; ligand-independent; run once per multi-FASTA).**
 
 | Stage | Steps | Title | Replay (no GPU) | Live RTX 2060 (R5) | Notes |
 |------:|:-----:|-------|:---------------:|:------------------:|-------|
-| 1 | 1–3 | Input ingestion | < 1 s | < 1 s | TSV load + schema check |
+| 1 | 1–3 | Input ingestion | < 1 s | < 1 s | Multi-FASTA + multi-SMILES TSV load + schema check |
 | 2 | 4–6 | Sequence QC + dereplication (MMseqs2) | n/a | < 30 s for ≤ 10 sequences (estimated) | MMseqs2 default identity ≥ 0.95 |
-| 3 | 7–10 | Pre-docking biological triage | < 1 s (rule application) | ~ 30–60 s/protein incl. DeepTMHMM cloud call (estimated) | Rules R1–R5 are O(1); DeepTMHMM dominates |
-| 4 | 11–15 | Structure prediction (**AlphaFold 3 default** via AlphaFold Server or local install; AlphaFold 2 / ColabFold or ESMFold alt) | 0 s (AW1_ref reuse) | 0 s (RCSB receptor reuse) | Live forward run: AF3 typically returns 5 ranked models within minutes on AlphaFold Server (server-side compute; subject to per-day quota). AF2 / ColabFold T4 estimate: 5–15 min/protein. |
-| 5 | 16–18 | Pocket detection (P2Rank) | 0 s (CSV reuse) | n/a (R5 used crystal centres) | ~ 30 s/structure (estimated) |
-| 6 | 19–22 | Ligand preparation (RDKit + Open Babel) | < 1 s/ligand | < 1 s/ligand | RDKit 3D embed + MMFF94 |
-| 7 | 23–25 | Auto-box configuration | < 1 s/case | < 1 s/case | 22 Å min exercised on all 16 R5 cases |
-| 8 | 26–30 | Docking (GNINA 1.3) | 0 s (replay ingests ground truth) | **~ 12–17 s/case** | exhaustiveness = 32, num_modes = 9, seed = 0 |
-| 9 | 31–33 | Interaction profiling (PLIP + Bio.PDB) | < 1 s/pair | < 1 s/pair (estimated) | Framework code present |
-| 10 | 34–36 | Aggregation + ranking | < 1 s for 6 cases | < 1 s for 16 cases | Pandas z-score + best-of-N |
-| 11 | 37–40 | Visualisation (py3Dmol HTML + ChimeraX `.cxc`) | n/a | n/a (frozen pending Mr_Dock) | Artifact 3 still blocked |
-| 12 | 41–43 | Reproducibility (manifest + checksums) | < 1 s | < 1 s | SHA-256 |
+| 3 | 7–10 | Pre-docking biological triage | < 1 s | ~ 30–60 s/protein incl. DeepTMHMM cloud call (estimated) | Rules R1–R5 are O(1); DeepTMHMM dominates |
+| 4 | 11–15 | **Structure prediction (AF2 / ColabFold default; AF3 alt; ESMFold fallback) — single `colabfold_batch` multi-FASTA call** | 0 s (AW1_ref reuse) | 0 s (RCSB receptor reuse) | Live AF2 / ColabFold T4 estimate: 5–15 min/protein, **sequential GPU inference** (`colabfold_batch` is a single-command shorthand, not multi-GPU parallelism); length-sorted queries amortise JAX/XLA cache. AF3 alternative consumes pre-computed AlphaFold Server output. |
+| 5 | 16–18 | Pocket detection (P2Rank) — single batch over all proteins | 0 s (CSV reuse) | n/a (R5 used crystal centres) | ~ 30 s/structure (estimated) |
+|  *Phase A output: `structure_registry.tsv` (protein_name / seq_sha / pdb_path / pocket_csv / pLDDT_mean / af2_runtime_s) — re-used by all Phase B runs without re-prediction.* |
 
-**Reference run totals.** Tier 1 replay (6 cases, no GPU): end-to-end < 1 s. RCSB seed external redocking (16 cases, RTX 2060): end-to-end ~ 4 min wall-clock for Stages 6–10 only (Stages 4–5 reuse crystal data; Stages 11–12 not yet integrated). Live Tier 1 forward run on Colab T4 (estimated, not measured): Stage 4 dominates at ~ 5–15 min/protein × 3 proteins → ~ 15–45 min for structure prediction, plus ≤ 5 min for the remaining stages.
+**Phase B — Selective ligand scoring (Stages 6–12; ligand-dependent; run per selected subset).**
+
+| Stage | Steps | Title | Replay (no GPU) | Live RTX 2060 (R5) | Notes |
+|------:|:-----:|-------|:---------------:|:------------------:|-------|
+| 6 | 19–22 | Ligand preparation (RDKit ETKDGv3 + Open Babel) | < 1 s/ligand | < 1 s/ligand | Cache by SMILES SHA |
+| **6.5** | **23–24** | **Selection step — ipywidgets multi-select UI: choose protein subset and ligand subset for this run** | **n/a** | **interactive (≤ 1 min user input)** | **N′ × M′ pair count is the user's decision; the cache skips pairs already scored** |
+| 7 | 25–27 | Auto-box configuration — selected pairs only | < 1 s/case | < 1 s/case | 22 Å min exercised on all 16 R5 cases |
+| 8 | 28–32 | Docking (GNINA 1.3) — selected pairs only; append-only `docking_master.csv` | 0 s (replay ingests ground truth) | **~ 12–17 s/case** | exhaustiveness = 32, num_modes = 9, seed = 0 |
+| 9 | 33–35 | Interaction profiling (PLIP + Bio.PDB) — selected pairs only | < 1 s/pair | < 1 s/pair (estimated) | Framework code present |
+| 10 | 36–38 | Aggregation + ranking — selected matrix only | < 1 s for 6 cases | < 1 s for 16 cases | Pandas z-score + best-of-N (best-of-N is diagnostic, not operational; cf. §10.1) |
+| 11 | 39–42 | Visualisation (py3Dmol HTML + ChimeraX `.cxc`) — selected pairs only | n/a | n/a (frozen pending Mr_Dock) | Artifact 3 still blocked |
+| 12 | 43–44 | Reproducibility (manifest + checksums) | < 1 s | < 1 s | SHA-256; manifest records both phases |
+
+**Reference run totals.** Tier 1 replay (6 cases, no GPU): end-to-end < 1 s. RCSB seed external redocking (16 cases, RTX 2060): Phase B end-to-end ~ 4 min wall-clock for Stages 6–10 only (Phase A bypassed via crystal-receptor reuse; Stages 11–12 not yet integrated). Live Tier 1 Phase A on Colab T4 (estimated, not measured): one `colabfold_batch` call over the three Tier 1 FASTAs takes ~ 15–45 min total (5–15 min per protein, sequential GPU inference). Subsequent Phase B runs against the cached Phase A output complete in seconds (replay) or ~ 12–17 s per selected pair (live).
 
 ### Critical Steps
 
 - **Step 7** (Stage 3, triage tool selection). DeepTMHMM is the default; switch to Phobius via `--triage-tool phobius` only if Phobius is installed locally. The downstream rules R1–R5 are tool-independent.
-- **Step 23** (Stage 7, auto-box). When `ligand_max_dim > 12 Å`, the box-size formula yields > 22 Å. Verify the box does not exceed the receptor diameter; if it does, supply an explicit `--box-size` (this exits the zero-parameter contract).
-- **Step 26** (Stage 8, GNINA seed). `seed = 0` is fixed. **Always inspect the per-case `top_pose_rmsd_a` and `best_pose_rmsd_a` columns together** (cf. §10.2): when their ratio is large, treat the case as low-confidence and queue it for the consensus-pose rule (§11.1).
+- **Step 11** (Stage 4, single Phase A `colabfold_batch` call). Use length-sorted queries (`--sort-queries-by length`) so the JAX/XLA compilation cache is re-used across the multi-FASTA; this is the largest single throughput contributor on a single Colab GPU. The batch is a *single command for sequential queries*, **not** multi-GPU parallelism (cf. §10.6).
+- **Steps 23–24** (Stage 6.5, selection step). Choose the protein × ligand subset for this Phase B run via the ipywidgets multi-select UI; pairs already in `phase_b/runs/<case_id>/` are skipped automatically.
+- **Step 25** (Stage 7, auto-box). When `ligand_max_dim > 12 Å`, the box-size formula yields > 22 Å. Verify the box does not exceed the receptor diameter; if it does, supply an explicit `--box-size` (this exits the zero-parameter contract).
+- **Step 28** (Stage 8, GNINA seed). `seed = 0` is fixed. **Always inspect the per-case `top_pose_rmsd_a` and `best_pose_rmsd_a` columns together** (cf. §10.2): when their ratio is large, treat the case as low-confidence and queue it for the consensus-pose rule (§11.1).
 
 ### Pause Points
 
 - After Stage 3 (review `triage_report.tsv` before consuming GPU on Stage 4).
-- After Stage 4 (inspect predicted Confidence per ranked model; for AlphaFold 3, use the iPTM / pLDDT JSON metrics returned alongside each PDB; for AlphaFold 2 / ColabFold, flag pLDDT median < 70).
+- After Stage 4 (inspect predicted confidence per ranked model; for AlphaFold 2 / ColabFold, flag pLDDT median < 70; for AlphaFold 3 alternative path, use the iPTM / pLDDT JSON metrics returned alongside each PDB).
+- After Stage 5 (review `structure_registry.tsv`; this is the canonical Phase A handoff to Phase B).
+- After Stage 6.5 (confirm the selected protein × ligand subset before launching Stage 8 docking).
 - After Stage 8 (inspect raw docking results; check the top-1 vs best-of-9 column ratio per case).
 
-### Stage 4 backend — operating instructions
+### Stage 4 backend — operating instructions (Phase A)
 
-- **AlphaFold 3 via AlphaFold Server (default).** Submit each FASTA in `01_Tier1_input/proteins/` to https://alphafoldserver.com (academic free use; subject to a per-day quota). After the server completes a job, download the `fold_<job_id>.zip` archive containing the 5 ranked PDBs plus per-model metrics, place the unzipped folder under `06_Report/Mr_Repro/external_validation/<protein_id>/` (or any path of the user's choice), and point DAD's loader at that directory: `dad.core.structure.load_af3_all_models(af3_results_path)`. Stage 5 (P2Rank) then consumes the ranked PDB(s) directly. The protocol does **not** redistribute the AlphaFold Server outputs; users keep them in their own environment.
-- **AlphaFold 3 via local install (alternative).** Clone https://github.com/google-deepmind/alphafold3, obtain the AlphaFold 3 model weights via the DeepMind academic-access channel, and install per the upstream README. The same `dad.core.structure.load_af3_all_models()` loader handles the local-install output schema.
-- **AlphaFold 2 via ColabFold v1.6.1 (alternative for higher-throughput batches).** Run `colabfold_batch <fasta> <out_dir> --num-recycle 3` either in the user's Colab notebook or locally; DAD's loader (`load_colabfold_pdb`) consumes the ranked PDBs and per-model pLDDT JSON.
+- **AlphaFold 2 via ColabFold v1.6.1 (default).** Place the multi-FASTA at `phase_a/input_sequences.fasta` and invoke a single Phase A run as `colabfold_batch input_sequences.fasta phase_a/colabfold_out --num-models 1 --num-recycle 3 --sort-queries-by length --msa-mode mmseqs2_uniref_env --zip` (rationale in `two_phase_architecture_plan.md` §2). DAD's loader (`dad.core.structure.load_colabfold_batch_output`) writes `structure_registry.tsv` and copies rank-1 PDBs to `phase_a/structure_cache/<seq_sha[:12]>_<name>.pdb`. The cache makes re-running Phase B against the same multi-FASTA free.
+- **AlphaFold 3 via AlphaFold Server (alternative).** Submit each FASTA to https://alphafoldserver.com (free academic; per-day quota approximately 50 jobs caps batch throughput). After server jobs complete, download the `fold_<job_id>.zip`, unzip under `phase_a/af3_external/<protein_id>/`, and call `dad.core.structure.load_af3_all_models()` to populate the same `structure_registry.tsv`. The protocol does **not** redistribute AlphaFold Server outputs.
+- **AlphaFold 3 via local install (alternative).** Clone https://github.com/google-deepmind/alphafold3, obtain weights via the DeepMind academic-access channel, install per the upstream README, and use the same `load_af3_all_models()` loader.
 - **ESMFold via API (short-protein fallback).** When an MSA is not available or the protein is short, `dad.core.structure.load_esmfold_pdb` queries the ESMFold inference API and returns a single PDB; subsequent stages are unchanged.
 
-The full numbered step list (steps 1–43) is given in Supplementary Information §SI-Procedure.
+The full numbered step list (Phase A steps 1–18; Phase B steps 19–44) is given in Supplementary Information §SI-Procedure.
 
 ---
 
@@ -231,6 +246,8 @@ Every row below corresponds to a real failure encountered during DAD development
 ### 9.1 Tier 1 replay (regression test against the supporting primary paper)
 
 The Tier 1 ground truth is the dipeptide–regulator binding table reported in the supporting *F. islandicum* AW-1 starvation manuscript (`Claude_web/Revision.txt`; see `primary_paper_relationship.md`). Six pairs cover three protein topologies (multi-pass MCP via R3 path C; soluble Crp/Fnr via R3 path B; soluble SBP RbsB via R3 path B with R5 boost) and two ligand chemotypes (Ala-Ile, Gly-Val).
+
+The Tier 1 worked example demonstrates the two-phase architecture explicitly. **Phase A** is run once over the three Tier 1 FASTAs (NA23_RS01195, NA23_RS08105, NA23_RS00870) and produces three rank-1 PDBs and three pocket CSVs that populate `structure_registry.tsv`; in `tier1_replay` mode this phase reuses the precomputed `AW1_ref/structure_*.pdb` and pocket CSVs without invoking ColabFold. **Phase B** then runs against that registry. With the Stage 6.5 selection step set to `proteins = {MCP, Crp, RbsB}` and `ligands = {Ala-Ile, Gly-Val}`, Phase B produces the six-pair matrix Table 4. With a narrower selection (e.g. `proteins = {RbsB}`, `ligands = {Gly-Val}`), Phase B produces a single-pair score and the case-id cache makes any later all-pair re-run free for already-scored pairs. The architecture is therefore tested end-to-end: Phase A is amortised across multiple Phase B subsets.
 
 DAD in `tier1_replay` mode reproduces all six values to numerical equality (Δ_vina = Δ_cnn_pose = Δ_cnn_aff = 0.0; 6 / 6 PASS; `06_Report/Mr_Repro/results/benchmark/validation_table.tsv`; SHA-256 in `manifest.json`). The replay does not re-run GNINA — it ingests `Revision.txt` ground truth at Stage 8 — so the zero-delta result establishes the protocol's I/O contract (manifest, schema, encoding, case-id construction, validation harness) but **not** that GNINA on the user's hardware reproduces the same numbers from scratch. That test is what §9.2 provides on an independent set.
 
@@ -285,15 +302,19 @@ The 16-case benchmark verifies pose recovery on co-crystallised pairs. It does n
 
 This manuscript explicitly does **not** claim the protocol is "fully validated"; Tier-2 ~60-pair benchmark is **not completed** (planned Phase D); decoy / enrichment evaluation is **not completed**; best-of-9 is **not** presented as a prospective operational metric; and exact bitwise score identity across GPU architectures is not assumed (comparable scores within tolerance only). The supporting primary paper requirement is satisfied (Sung J-Y et al., *iScience* 2026, peer-reviewed published).
 
-### 10.5 AlphaFold 3 access constraint
+### 10.5 Stage 4 backend constraints (AF2 sequential GPU + AF3 access)
 
-AF3 weights are released by Google DeepMind under restricted academic access; the protocol uses either the (free, web-based) AlphaFold Server output or a user-installed copy of the AlphaFold 3 codebase (https://github.com/google-deepmind/alphafold3). AlphaFold Server's per-day quota (~50 jobs) caps batch throughput; for high-throughput campaigns, ColabFold AF2 is the recommended alternative.
+Two structure-prediction backend constraints shape the protocol's throughput envelope.
+
+**AF2 / ColabFold sequential GPU inference.** The protocol's default Stage 4 backend, `colabfold_batch` over a multi-FASTA, is a **single command for sequential queries on a single GPU** rather than multi-GPU parallelism. Length-sorted queries (`--sort-queries-by length`) re-use the JAX/XLA compilation cache and are the largest single throughput contributor on a single Colab T4, but per-query inference time still adds up linearly. For a Tier 1-sized run (3 proteins) the wall-clock is ~ 15–45 minutes; for tens of proteins the user should plan multiple Colab sessions or delegate Phase A to a local GPU. The two-phase architecture (§7) keeps this cost amortised — Phase A is run once per multi-FASTA and cached in `structure_registry.tsv`; subsequent Phase B subsets re-use the cache without re-invoking the structure-prediction backend.
+
+**AlphaFold 3 access.** AF3 weights are released by Google DeepMind under restricted academic access; the protocol uses either the (free, web-based) AlphaFold Server output or a user-installed copy of the AlphaFold 3 codebase (https://github.com/google-deepmind/alphafold3). AlphaFold Server's per-day quota (~50 jobs) caps batch throughput, and direct AF3 invocation from inside a Colab notebook is currently impractical for the protocol's user persona — AF2 / ColabFold is therefore the verified default. For high-throughput campaigns, AF2 / ColabFold remains the recommended Phase A backend; AF3 is supported as an alternative when pre-computed Server or local-install output is available.
 
 ---
 
 ## 11. Reporting summary — *target ≈ 200 words*
 
-- **Software versions**: AlphaFold 3 (default Stage 4 backend; AlphaFold Server https://alphafoldserver.com or local install https://github.com/google-deepmind/alphafold3), AlphaFold 2 / ColabFold ≥ 1.6.1 (alternative), ESMFold (short-protein fallback), GNINA 1.3.2 (`master:f23dd2b`), P2Rank ≥ 2.4, DeepTMHMM v1.0.24, RDKit 2024.09+, Open Babel 3.1+, PLIP 2.3+, MMseqs2 release_15, Snakemake ≥ 8.0. Pinned versions in `runtime_freeze.md` §1 and `tools/gnina_runtime/MANIFEST.md`.
+- **Software versions**: AlphaFold 2 via ColabFold ≥ 1.6.1 (default Stage 4 backend; single `colabfold_batch` multi-FASTA call with `--num-models 1 --num-recycle 3 --sort-queries-by length --msa-mode mmseqs2_uniref_env --zip`), AlphaFold 3 (alternative; AlphaFold Server https://alphafoldserver.com or local install https://github.com/google-deepmind/alphafold3), ESMFold (short-protein fallback), GNINA 1.3.2 (`master:f23dd2b`), P2Rank ≥ 2.4, DeepTMHMM v1.0.24, RDKit 2024.09+, Open Babel 3.1+, PLIP 2.3+, MMseqs2 release_15, Snakemake ≥ 8.0. Pinned versions in `runtime_freeze.md` §1 and `tools/gnina_runtime/MANIFEST.md`.
 - **Database versions**: BindingDB (date-stamped at user run), BioLiP2 (weekly snapshot), CrossDocked2020 (Zenodo DOI 10.5281/zenodo.4045263), ChEMBL release N, AlphaFold DB (date), HMDB (date; CC BY-NC 4.0 flag), MetaboLights (date), RCSB PDB (CC0).
 - **Random seeds**: GNINA `seed = 0`, `exhaustiveness = 32`, `num_modes = 9` (defaults).
 - **Hardware**: GPU model + driver + CUDA version recorded in `gnina_environment_check.json` and `manifest.json`.

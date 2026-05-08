@@ -170,3 +170,60 @@ All 7 prior codex fixes were preserved intact in §3b: RESTART_REQUESTED condaco
 - `Publication/DAD_protocol.ipynb`
 - `Publication/code/notebooks/DAD_protocol.ipynb`
 - `Publication/code/README.md`
+
+
+## 2026-05-08: Two-phase architecture (Phase A structure prep / Phase B selective ligand scoring)
+
+### User-facing change
+
+The notebook was redesigned from a single linear pipeline into two explicit phases:
+
+- **Phase A (§0–4):** FASTA input → structure prediction → pocket detection → `structure_registry.tsv`. Run once per protein set. Proteins are cached by `sha256(sequence)[:12]`; re-running skips proteins already in `phase_a/structure_cache/`.
+- **Phase B (§5–10):** SMILES input → ipywidgets multi-select UI (proteins × ligands) → combinatorial GNINA dispatcher → `docking_master.csv` (append-only). Only selected pairs are docked; cache-hit pairs are skipped.
+
+### AF2 speed settings
+
+`colabfold_batch` CLI is now the default structure mode (`STRUCTURE_MODE = "colabfold_af2"`).
+Settings from `AF2_colabfold_batch_setting_plan.md`:
+
+```
+--model-type auto
+--msa-mode mmseqs2_uniref_env
+--num-models 1           (~5x faster vs 5-model default)
+--num-recycle 3
+--sort-queries-by length  (JAX/XLA cache reuse)
+--zip
+```
+
+Fast preview toggle: `AF2_FAST_PREVIEW = True` adds `--num-relax 0 --templates 0` (~2x additional speedup).
+
+### STRUCTURE_MODE (5 options, default changed to `colabfold_af2`)
+
+| Value | Meaning |
+|---|---|
+| `colabfold_af2` | **new default** — multi-FASTA `colabfold_batch` CLI on GPU |
+| `af3_results` | ingest AF3 Server CIF results (external only — AF3 direct execution not supported on Colab) |
+| `esmfold_api` | ESMFold public API fallback |
+| `user_pdb` | upload existing PDB |
+| `auto` | cache → ESMFold API → ColabFold AF2 fallback chain |
+
+### Cache architecture
+
+- Protein: `phase_a/structure_cache/<seq_sha[:12]>_<name>.pdb`
+- Ligand:  `phase_b/ligands/<smiles_sha[:12]>_<name>.sdf`
+- Pair:    `phase_b/runs/<protein_sha>_<ligand_sha>/docked.sdf`
+
+Re-run safety: new SMILES → Phase A 0% recompute. New protein → only new protein computed.
+
+### Selection UI
+
+`§6` uses `ipywidgets.SelectMultiple` (two panels: proteins / ligands) + "Select all" buttons + "Run docking on selection" button. Button is wired in `§7` via `run_btn.on_click`. Widget-less fallback runs all × all immediately.
+
+### Codex 7 fixes preserved
+
+RESTART_REQUESTED condacolab flag, TF `.so` cleanup (`patch_tensorflow_for_colabfold()`), `ensure_colabfold_ready()` with `colabfold[alphafold-minus-jax] @ git+...`, `apply_af2_preset()`, `ensure_amber_ready()` (OpenMM/PDBFixer), `AF2_RELAX_TOP_N`, ESMFold 413 fallback chain — all preserved in `§2` (Phase A structure cell).
+
+### Files updated
+
+- `Publication/DAD_protocol.ipynb`
+- `Publication/code/notebooks/DAD_protocol.ipynb`

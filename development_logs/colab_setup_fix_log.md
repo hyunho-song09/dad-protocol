@@ -134,3 +134,4 @@ The ESMFold public API can reject long requests. The previous ColabFold block wa
 - ColabFold install now uses the AlphaFold2.ipynb backend: `colabfold[alphafold-minus-jax] @ git+https://github.com/sokrypton/ColabFold`.
 - The notebook applies the TensorFlow `.so` cleanup from the reference AlphaFold2 notebook before ColabFold import.
 - AF2 quality controls were added: `AF2_PRESET`, `AF2_MODEL_TYPE`, `AF2_NUM_RECYCLES`, `AF2_NUM_MODELS`, `AF2_NUM_SEEDS`, and `AF2_RELAX_TOP_N`.
+- If `AF2_RELAX_TOP_N > 0`, the structure step installs OpenMM/PDBFixer via mamba before AMBER relaxation.

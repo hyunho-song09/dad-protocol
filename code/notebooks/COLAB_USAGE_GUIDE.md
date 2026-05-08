@@ -118,6 +118,8 @@ Use one of:
 
 HTTP 413 means the ESMFold API rejected the sequence size. Keep `STRUCTURE_MODE="auto"`; the notebook will switch to ColabFold AF2 and apply the TensorFlow crash patch used in the AlphaFold2.ipynb reference notebook.
 
+For the most conservative AF2 setting, use `AF2_PRESET="high_accuracy"`. If you also set `AF2_RELAX_TOP_N=1`, the notebook installs OpenMM/PDBFixer before AMBER relaxation.
+
 ### GNINA not found
 
 Run Setup with:

@@ -7,7 +7,7 @@ DAD is a user-input protein-ligand docking notebook and code package.
 
 ## What It Does
 
-- accepts multi-FASTA protein input;
+- accepts raw protein sequences, pasted FASTA text, or uploaded FASTA files;
 - accepts unnamed SMILES, `name:SMILES`, or semicolon-separated SMILES;
 - prepares 3D ligand SDF files;
 - separates Phase A structure preparation from Phase B ligand scoring;
@@ -20,7 +20,7 @@ DAD is a user-input protein-ligand docking notebook and code package.
 1. Open the Colab notebook.
 2. Run `0. Setup Environment`.
 3. If condacolab restarts the kernel, run all cells again.
-4. In SS1, paste multi-FASTA sequences.
+4. In SS1, choose `paste`, `upload_fasta`, or `example`; a single raw sequence works without a FASTA header.
 5. In SS2, keep `STRUCTURE_MODE="colabfold_af2"` or choose `auto`, `af3_results`, `esmfold_api`, or `user_pdb`.
 6. In SS5, paste SMILES entries in `smiles_text`.
 7. Select protein-ligand pairs and export `phase_b/docking_master.csv`.
@@ -44,6 +44,12 @@ FASTA:
 ```text
 >ProteinA
 MRNMSIFMKVMVIVLILALGMIVIGVYSTFAL...
+```
+
+Uploaded FASTA:
+
+```text
+Set PROTEIN_INPUT_MODE="upload_fasta" and either upload a file in Colab or set protein_fasta_path.
 ```
 
 Unnamed ligand:

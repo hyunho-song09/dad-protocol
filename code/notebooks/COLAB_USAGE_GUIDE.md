@@ -5,7 +5,7 @@
 1. Open `DAD_protocol.ipynb`.
 2. Run `0. Setup Environment`.
 3. If condacolab restarts the kernel, run all cells again.
-4. In SS1, paste one or more protein FASTA records.
+4. In SS1, paste a raw protein sequence, paste FASTA text, or upload a FASTA file.
 5. In SS2, keep `STRUCTURE_MODE="colabfold_af2"` for direct AF2 prediction, or choose `auto`, `af3_results`, `esmfold_api`, or `user_pdb`.
 6. In SS3-SS4, create `phase_a/structure_registry.tsv`.
 7. In SS5, paste one or more SMILES entries.
@@ -32,6 +32,16 @@ Phase A is sequence-only and ligand-independent. To test new ligands against the
 The notebook reloads `structure_registry.tsv` when Phase B starts in a fresh runtime.
 
 ## Accepted Inputs
+
+Protein input:
+
+Use `PROTEIN_INPUT_MODE="paste"` for a raw sequence or FASTA text. Use `upload_fasta` to upload a `.fasta` file in Colab.
+
+Raw sequence:
+
+```text
+MRNMSIFMKVMVIVLILALGMIVIGVYSTFAL...
+```
 
 FASTA:
 

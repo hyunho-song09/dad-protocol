@@ -189,6 +189,28 @@ All 7 prior codex fixes were preserved intact in §3b: RESTART_REQUESTED condaco
 - `code/README.md`
 - `code/notebooks/COLAB_USAGE_GUIDE.md`
 
+## 2026-05-09: Colab notebook input UX and GitHub notebook repair
+
+### Findings fixed
+
+- Repaired the root `DAD_protocol.ipynb` after the GitHub notebook copy developed BOM/mojibake display issues and diverged from `code/notebooks/DAD_protocol.ipynb`.
+- Replaced the "Multi-FASTA Input" cell with a simpler "Protein Input" cell.
+- Added three protein input modes: `paste`, `upload_fasta`, and `example`.
+- Allowed a single raw amino-acid sequence with `protein_name`, so users do not need to learn FASTA headers for the common case.
+- Kept FASTA text support for multiple proteins and Colab upload support for `.fasta` files.
+- Made duplicate protein names auto-resolve with suffixes instead of failing with a cryptic assertion.
+- Installed the DAD package from GitHub during setup so optional advanced visualization helpers can run in Colab.
+- Added safer docking controls: widget selection defaults to one pair, and non-widget fallback no longer starts all-by-all docking unless `RUN_DOCKING_NOW=True`.
+- Added GNINA REMARK score parsing for notebook docking results.
+
+### Files updated
+
+- `DAD_protocol.ipynb`
+- `code/notebooks/DAD_protocol.ipynb`
+- `README.md`
+- `code/README.md`
+- `code/notebooks/COLAB_USAGE_GUIDE.md`
+
 
 ## 2026-05-08: Two-phase architecture (Phase A structure prep / Phase B selective ligand scoring)
 

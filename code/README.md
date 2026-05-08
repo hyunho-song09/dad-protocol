@@ -6,14 +6,14 @@
 
 | Phase | Steps | Input | Output |
 |---|---|---|---|
-| Phase A: structure prep | SS0-SS4 | Multi-FASTA | PDB cache, pocket cache, `structure_registry.tsv` |
+| Phase A: structure prep | SS0-SS4 | raw sequence, FASTA text, or uploaded FASTA | PDB cache, pocket cache, `structure_registry.tsv` |
 | Phase B: selective ligand scoring | SS5-SS10 | Multi-SMILES and selected pairs | `docking_master.csv`, ranked table, heatmap, visualization artifacts |
 
 ## What It Does
 
 | Stage | Description |
 |---|---|
-| Input | Multi-FASTA; raw sequences are auto-named `Protein_1`, `Protein_2`, ... |
+| Input | `paste`, `upload_fasta`, or `example`; single raw sequences do not need FASTA headers |
 | Structure | Default `colabfold_af2`; alternatives are `af3_results`, `esmfold_api`, `user_pdb`, and `auto` |
 | Pocket | P2Rank batch when available; protein-center fallback when P2Rank is unavailable |
 | Ligand | Multi-SMILES, one `name:SMILES` per line or semicolon-separated; SHA-keyed SDF cache |
@@ -25,7 +25,7 @@
 
 Phase A, run once per protein set:
 
-1. SS1: paste multi-FASTA sequences.
+1. SS1: paste a raw sequence, paste FASTA text, or upload a FASTA file.
 2. SS2: keep `STRUCTURE_MODE="colabfold_af2"` or choose another backend.
 3. SS3-SS4: run pocket detection and write `structure_registry.tsv`.
 

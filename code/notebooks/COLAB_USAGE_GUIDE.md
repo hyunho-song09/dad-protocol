@@ -7,7 +7,7 @@
 3. If the kernel restarts after condacolab, run all cells again.
 4. Paste your protein sequence or FASTA.
 5. Paste a ligand SMILES string.
-6. Keep `STRUCTURE_MODE="colabfold"` to predict from sequence, or switch to `existing_or_upload` for your own PDB.
+6. Keep `STRUCTURE_MODE="esmfold_api"` to predict from sequence, or switch to `existing_or_upload` for your own PDB.
 7. Run docking and download the result archive.
 
 ## Progress Bars
@@ -18,7 +18,7 @@ Every notebook step prints a progress bar:
 Setup Environment: [########------------] 50% 4/8 chemistry packages
 ```
 
-Long-running commands such as ColabFold and GNINA still report only step-level progress.
+Long-running commands such as ESMFold API prediction and GNINA still report only step-level progress.
 
 ## Accepted Inputs
 
@@ -57,8 +57,9 @@ LigandA:CCO;LigandB:CCN
 
 | Option | Use When |
 |---|---|
-| `existing_or_upload` | You already have PDB/CIF files |
-| `colabfold` | You want ColabFold to predict structures from FASTA |
+| `esmfold_api` | Default sequence-to-PDB prediction without AlphaFold/TensorFlow installs |
+| `existing_or_upload` | You already have PDB files |
+| `colabfold` | Optional advanced mode on Python versions compatible with AlphaFold/TensorFlow |
 
 For `existing_or_upload`, put files in:
 
@@ -73,6 +74,17 @@ EXISTING_PDB_DIR=/path/to/pdbs
 ```
 
 The expected file name is `Protein_1.pdb` unless the FASTA header gives another ID.
+
+
+## Reuse Mode
+
+To test new ligands against the same protein:
+
+1. Keep the same `job_name`.
+2. Change only `custom_ligand_smiles`.
+3. Run from `1. Input Data` onward.
+
+The structure cell reuses `structure_manifest.tsv` and the sequence-hash cache before any new prediction.
 
 ## Outputs
 
@@ -96,9 +108,9 @@ Paste either raw SMILES or `name:SMILES`. Raw SMILES is now accepted.
 
 Use one of:
 
+- keep `STRUCTURE_MODE="esmfold_api"` and retry;
 - upload `Protein_1.pdb` to `WORK_DIR/structures`;
-- set `EXISTING_PDB_DIR`;
-- set `STRUCTURE_MODE="colabfold"`.
+- set `EXISTING_PDB_DIR`.
 
 ### GNINA not found
 

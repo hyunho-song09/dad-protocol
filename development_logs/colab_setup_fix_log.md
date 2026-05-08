@@ -79,3 +79,33 @@ and ColabFold run diagnostics to:
 ```text
 WORK_DIR/structures/colabfold.log
 ```
+
+
+## 2026-05-08: ColabFold TensorFlow binary import failure on Python 3.12
+
+### User-facing symptom
+
+`3. Structure Input or Prediction` failed after installing AlphaFold extras:
+
+```text
+ImportError: ... _pywrap_tensorflow_lite_metrics_wrapper.so: undefined symbol
+RuntimeError: ColabFold failed. See structures/colabfold.log
+```
+
+### Root cause
+
+The failing runtime reached AlphaFold/TensorFlow import, but the TensorFlow binary loaded by Colab Python 3.12 was incompatible. This is not a GPU quota error and is not fixed by repeatedly reinstalling `colabfold[alphafold]`.
+
+### Fix
+
+- Default structure mode is now `esmfold_api`, which posts the input sequence to the ESMFold PDB API and avoids AlphaFold/TensorFlow installation.
+- `colabfold` remains an optional mode, but the notebook blocks it on Python 3.12+ with an explicit error message.
+- Predicted or uploaded PDB files are cached by protein sequence hash.
+- Users can keep the same `job_name`, change `custom_ligand_smiles`, and rerun from `1. Input Data` onward to score new ligands against the cached PDB.
+
+### Files updated
+
+- `DAD_protocol.ipynb`
+- `code/notebooks/DAD_protocol.ipynb`
+- `README.md`
+- `code/notebooks/COLAB_USAGE_GUIDE.md`

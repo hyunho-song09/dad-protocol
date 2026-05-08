@@ -10,8 +10,8 @@ All data underlying the quantitative claims of this manuscript are publicly avai
 
 The DAD project repository contains all in-tree validation artifacts, runner scripts, and per-case outputs.
 
-- **Repository URL**: https://github.com/hyunho-song09/dad-protocol (corresponding author has completed the GitHub OAuth step; team-lead has proposed `dad-protocol` as a public repository — final URL pending). Proposed git tag at submission: `v0.1.0`.
-- **Zenodo archive**: on hold per corresponding author (2026-05-08); to be minted at primary-paper acceptance.
+- **Repository URL**: https://github.com/hyunho-song09/dad-protocol (public; available at acceptance of this protocol manuscript). HTTPS clone: `https://github.com/hyunho-song09/dad-protocol.git`. One-click Colab runner: `https://colab.research.google.com/github/hyunho-song09/dad-protocol/blob/main/DAD_protocol.ipynb`. Proposed git tag at submission: `v0.1.0`.
+- **Zenodo archive**: on hold per corresponding author (2026-05-08); to be minted at acceptance of this protocol manuscript.
 - **Working tree root** (during development): `d:\project\experiment\DAD\` (mirrored to repository at submission).
 
 ### Tier-1 replay artifacts

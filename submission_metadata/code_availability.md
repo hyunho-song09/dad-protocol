@@ -8,7 +8,9 @@ All code underlying this protocol is open-source and available through the DAD p
 
 ## Repository
 
-- **URL**: https://github.com/hyunho-song09/dad-protocol (corresponding author has completed the GitHub OAuth step; team-lead has proposed `dad-protocol` as a public repository — final URL pending)
+- **URL**: https://github.com/hyunho-song09/dad-protocol (public; available at acceptance of this protocol manuscript)
+- **HTTPS clone**: `https://github.com/hyunho-song09/dad-protocol.git`
+- **Colab badge / one-click runner**: https://colab.research.google.com/github/hyunho-song09/dad-protocol/blob/main/DAD_protocol.ipynb
 - **Archived release**: Zenodo DOI on hold per corresponding author (2026-05-08); to be minted at acceptance of this protocol manuscript.
 - **Git tag at submission**: `v0.1.0` (proposed)
 
@@ -71,4 +73,4 @@ Equivalent commands for Colab and Docker / Apptainer paths are listed in `06_Rep
 
 ## Conditional availability
 
-The supporting primary paper (Sung J-Y et al., *iScience* 2026) is peer-reviewed and published, so the protocol's primary-paper requirement is already satisfied. The repository is currently in a private working tree pending submission of this protocol manuscript; the corresponding author has completed the GitHub OAuth step (2026-05-08) and the public repository (`dad-protocol`, proposed name) will be created and supplied to the editors at submission. At acceptance of this protocol manuscript the Zenodo archive will be minted.
+The supporting primary paper (Sung J-Y et al., *iScience* 2026) is peer-reviewed and published, so the protocol's primary-paper requirement is already satisfied. The repository is `https://github.com/hyunho-song09/dad-protocol` (public, available at acceptance of this protocol manuscript). At acceptance the Zenodo archive will be minted from the tagged release `v0.1.0`.

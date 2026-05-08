@@ -171,6 +171,24 @@ All 7 prior codex fixes were preserved intact in §3b: RESTART_REQUESTED condaco
 - `Publication/code/notebooks/DAD_protocol.ipynb`
 - `Publication/code/README.md`
 
+## 2026-05-08: Visualization upgrade from AW1 GININA notebooks
+
+### Findings fixed
+
+- Replaced the minimal py3Dmol-only pose display with an interaction visualization cell based on `AW1_ref/GININA_Ori.ipynb` and `AW1_ref/GININA_Template.ipynb`.
+- Added contact-residue detection at a configurable distance cutoff, with nearest atom-pair tracking for interaction cylinders.
+- Added export of per-case contact TSV, merged receptor-ligand complex PDB, ChimeraX CXC script, and optional py3Dmol HTML.
+- Added a combined `phase_b/visualizations/interaction_contacts.tsv` table for downstream reporting.
+- Added visualization artifact counts and output path to `manifest.json`.
+
+### Files updated
+
+- `DAD_protocol.ipynb`
+- `code/notebooks/DAD_protocol.ipynb`
+- `README.md`
+- `code/README.md`
+- `code/notebooks/COLAB_USAGE_GUIDE.md`
+
 
 ## 2026-05-08: Two-phase architecture (Phase A structure prep / Phase B selective ligand scoring)
 

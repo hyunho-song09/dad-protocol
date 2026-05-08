@@ -7,7 +7,7 @@
 | Phase | Steps | Input | Output |
 |---|---|---|---|
 | Phase A: structure prep | SS0-SS4 | Multi-FASTA | PDB cache, pocket cache, `structure_registry.tsv` |
-| Phase B: selective ligand scoring | SS5-SS10 | Multi-SMILES and selected pairs | `docking_master.csv`, ranked table, heatmap |
+| Phase B: selective ligand scoring | SS5-SS10 | Multi-SMILES and selected pairs | `docking_master.csv`, ranked table, heatmap, visualization artifacts |
 
 ## What It Does
 
@@ -19,7 +19,7 @@
 | Ligand | Multi-SMILES, one `name:SMILES` per line or semicolon-separated; SHA-keyed SDF cache |
 | Selection | `ipywidgets` multi-select for protein subset and ligand subset |
 | Docking | GNINA cross-product of selected pairs only; completed pair cache is reused |
-| Export | `phase_b/docking_master.csv`, ranked table, and diagnostic heatmap |
+| Export | `phase_b/docking_master.csv`, ranked table, diagnostic heatmap, contact TSV, complex PDB, and ChimeraX CXC |
 
 ## User Workflow
 
@@ -35,6 +35,7 @@ Phase B, repeat as needed:
 2. SS6: select proteins and ligands.
 3. SS7: run docking for selected pairs.
 4. SS8: update `docking_master.csv`.
+5. SS9: generate interaction visualization artifacts for the top completed poses.
 
 Re-running Phase B with new SMILES does not re-run Phase A.
 

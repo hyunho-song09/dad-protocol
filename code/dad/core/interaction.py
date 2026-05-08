@@ -53,16 +53,25 @@ def extract_contact_residues(
     - For each residue, find minimum atom-atom distance to any ligand atom.
     - Return residues with min_dist <= contact_distance, sorted by distance.
     """
-    from Bio.PDB import PDBParser
-
     if not Path(receptor_pdb).exists():
         raise FileNotFoundError(f"Receptor PDB not found: {receptor_pdb}")
     if not Path(docked_sdf).exists():
         raise FileNotFoundError(f"Docked SDF not found: {docked_sdf}")
+    if contact_distance <= 0:
+        return []
 
     ligand_coords = get_sdf_atom_coords(docked_sdf, model_index=pose_index)
     if len(ligand_coords) == 0:
         raise ValueError(f"No atom coordinates found in SDF model {pose_index}: {docked_sdf}")
+
+    try:
+        from Bio.PDB import PDBParser
+    except ModuleNotFoundError:
+        return _extract_contact_residues_plain(
+            receptor_pdb=receptor_pdb,
+            ligand_coords=ligand_coords,
+            contact_distance=contact_distance,
+        )
 
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("receptor", receptor_pdb)
@@ -90,6 +99,53 @@ def extract_contact_residues(
 
     contacts.sort(key=lambda r: r.min_dist)
     return contacts
+
+
+def _extract_contact_residues_plain(
+    receptor_pdb: str,
+    ligand_coords: np.ndarray,
+    contact_distance: float,
+) -> List[ContactResidue]:
+    """Fallback PDB parser used when BioPython is unavailable."""
+    residue_min: Dict[Tuple[str, int, str], float] = {}
+    for atom in _iter_pdb_atoms(receptor_pdb):
+        p_coord = np.array([atom["x"], atom["y"], atom["z"]], dtype=float)
+        d = float(np.linalg.norm(ligand_coords - p_coord, axis=1).min())
+        key = (atom["chain"], atom["res_id"], atom["res_name"])
+        if d <= contact_distance and (key not in residue_min or d < residue_min[key]):
+            residue_min[key] = d
+
+    contacts = [
+        ContactResidue(
+            chain=chain,
+            res_id=res_id,
+            res_name=res_name,
+            min_dist=round(dist, 3),
+            interaction_type="contact",
+        )
+        for (chain, res_id, res_name), dist in residue_min.items()
+    ]
+    contacts.sort(key=lambda r: r.min_dist)
+    return contacts
+
+
+def _iter_pdb_atoms(pdb_path: str) -> List[Dict[str, object]]:
+    atoms: List[Dict[str, object]] = []
+    for line in Path(pdb_path).read_text(errors="replace").splitlines():
+        if not line.startswith("ATOM"):
+            continue
+        try:
+            atoms.append({
+                "chain": line[21].strip() or "A",
+                "res_id": int(line[22:26]),
+                "res_name": line[17:20].strip() or "UNK",
+                "x": float(line[30:38]),
+                "y": float(line[38:46]),
+                "z": float(line[46:54]),
+            })
+        except ValueError:
+            continue
+    return atoms
 
 
 def get_sdf_atom_coords(

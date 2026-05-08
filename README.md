@@ -12,7 +12,8 @@ DAD is a user-input protein-ligand docking notebook and code package.
 - prepares 3D ligand SDF files;
 - separates Phase A structure preparation from Phase B ligand scoring;
 - reuses cached structures and selected protein-ligand pair outputs;
-- runs GNINA docking when available.
+- runs GNINA docking when available;
+- exports contact-residue tables, py3Dmol views, merged complex PDB files, and ChimeraX scripts for selected poses.
 
 ## Quick Start
 
@@ -23,6 +24,7 @@ DAD is a user-input protein-ligand docking notebook and code package.
 5. In SS2, keep `STRUCTURE_MODE="colabfold_af2"` or choose `auto`, `af3_results`, `esmfold_api`, or `user_pdb`.
 6. In SS5, paste SMILES entries in `smiles_text`.
 7. Select protein-ligand pairs and export `phase_b/docking_master.csv`.
+8. Run the visualization cell to write `phase_b/visualizations/` artifacts for the top poses.
 
 
 ## Two-Phase Reuse

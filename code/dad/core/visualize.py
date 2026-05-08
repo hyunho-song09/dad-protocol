@@ -101,13 +101,17 @@ def _compute_interaction_pairs(
     pose_index: int = 0,
 ) -> List[Tuple[List[float], List[float]]]:
     """Compute atom-pair contacts for cylinder drawing (mirrors cell 19)."""
-    from Bio.PDB import PDBParser
     from dad.core.interaction import get_sdf_atom_coords
     import numpy as np
 
     lig_coords = get_sdf_atom_coords(docked_sdf, pose_index)
     if len(lig_coords) == 0:
         return []
+
+    try:
+        from Bio.PDB import PDBParser
+    except ModuleNotFoundError:
+        return _compute_interaction_pairs_plain(receptor_pdb, lig_coords)
 
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("r", receptor_pdb)
@@ -131,6 +135,46 @@ def _compute_interaction_pairs(
                         best_p = p.tolist()
                 if min_dist <= search_distance and best_l and best_p:
                     pairs.append((best_l, best_p))
+    return pairs
+
+
+def _compute_interaction_pairs_plain(
+    receptor_pdb: str,
+    lig_coords,
+) -> List[Tuple[List[float], List[float]]]:
+    """Fallback atom-pair contacts used when BioPython is unavailable."""
+    import numpy as np
+
+    residues: Dict[Tuple[str, int, str], List[List[float]]] = {}
+    for line in Path(receptor_pdb).read_text(errors="replace").splitlines():
+        if not line.startswith("ATOM"):
+            continue
+        try:
+            key = (line[21].strip() or "A", int(line[22:26]), line[17:20].strip() or "UNK")
+            residues.setdefault(key, []).append([
+                float(line[30:38]),
+                float(line[38:46]),
+                float(line[46:54]),
+            ])
+        except ValueError:
+            continue
+
+    pairs: List[Tuple[List[float], List[float]]] = []
+    for atoms in residues.values():
+        min_dist = float("inf")
+        best_l = None
+        best_p = None
+        for p_coord in atoms:
+            p = np.array(p_coord, dtype=float)
+            dists = np.linalg.norm(lig_coords - p, axis=1)
+            idx = int(dists.argmin())
+            d = float(dists[idx])
+            if d < min_dist:
+                min_dist = d
+                best_l = lig_coords[idx].tolist()
+                best_p = p_coord
+        if min_dist <= 5.0 and best_l and best_p:
+            pairs.append((best_l, best_p))
     return pairs
 
 
@@ -284,12 +328,20 @@ def merge_receptor_ligand_pdb(
     2. Read ligand SDF (best pose), convert to PDB block via Chem.MolToPDBBlock.
     3. Concatenate and write to output_pdb.
     """
-    from rdkit import Chem
-
     if not Path(receptor_pdb).exists():
         raise FileNotFoundError(f"Receptor PDB not found: {receptor_pdb}")
     if not Path(docked_sdf).exists():
         raise FileNotFoundError(f"Docked SDF not found: {docked_sdf}")
+
+    try:
+        from rdkit import Chem
+    except ModuleNotFoundError:
+        return _merge_receptor_ligand_pdb_plain(
+            receptor_pdb=receptor_pdb,
+            docked_sdf=docked_sdf,
+            output_pdb=output_pdb,
+            pose_index=pose_index,
+        )
 
     with open(receptor_pdb, "r") as fh:
         rec_lines = [l for l in fh.readlines() if not l.rstrip().startswith(("END", "CONECT"))]
@@ -319,6 +371,105 @@ def merge_receptor_ligand_pdb(
         fh.write("END\n")
 
     return output_pdb
+
+
+def _merge_receptor_ligand_pdb_plain(
+    receptor_pdb: str,
+    docked_sdf: str,
+    output_pdb: str,
+    pose_index: int = 0,
+) -> str:
+    receptor_lines = [
+        line for line in Path(receptor_pdb).read_text(errors="replace").splitlines()
+        if not line.startswith(("END", "CONECT"))
+    ]
+    max_serial = 0
+    for line in receptor_lines:
+        if line.startswith(("ATOM", "HETATM")):
+            try:
+                max_serial = max(max_serial, int(line[6:11]))
+            except ValueError:
+                pass
+
+    ligand_atoms, ligand_bonds = _parse_sdf_atoms_bonds(docked_sdf, pose_index)
+    lines = list(receptor_lines)
+    serial_map: Dict[int, int] = {}
+    for idx, atom in enumerate(ligand_atoms, start=1):
+        serial = max_serial + idx
+        serial_map[idx] = serial
+        elem = (atom["element"] or "C").upper()[:2]
+        atom_name = f"{elem}{idx}"[:4]
+        lines.append(
+            f"HETATM{serial:5d} {atom_name:<4s} LIG Z   1    "
+            f"{atom['x']:8.3f}{atom['y']:8.3f}{atom['z']:8.3f}"
+            f"  1.00 20.00          {elem:>2s}"
+        )
+
+    for atom_a, atom_b in ligand_bonds:
+        if atom_a in serial_map and atom_b in serial_map:
+            lines.append(f"CONECT{serial_map[atom_a]:5d}{serial_map[atom_b]:5d}")
+
+    lines.append("END")
+    Path(output_pdb).parent.mkdir(parents=True, exist_ok=True)
+    Path(output_pdb).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return output_pdb
+
+
+def _parse_sdf_atoms_bonds(
+    sdf_path: str,
+    pose_index: int = 0,
+) -> Tuple[List[Dict[str, object]], List[Tuple[int, int]]]:
+    text = Path(sdf_path).read_text(errors="replace")
+    models = [m for m in text.split("$$$$") if m.strip()]
+    if not models:
+        return [], []
+    pose_index = max(0, min(pose_index, len(models) - 1))
+    lines = models[pose_index].splitlines()
+
+    counts_idx = None
+    atom_count = 0
+    bond_count = 0
+    for i, line in enumerate(lines[:20]):
+        if "V2000" not in line:
+            continue
+        parts = line.split()
+        try:
+            atom_count = int(parts[0])
+            bond_count = int(parts[1])
+            counts_idx = i
+        except (ValueError, IndexError):
+            pass
+        break
+    if counts_idx is None or atom_count <= 0:
+        return [], []
+
+    atoms: List[Dict[str, object]] = []
+    atom_start = counts_idx + 1
+    for line in lines[atom_start:atom_start + atom_count]:
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        try:
+            atoms.append({
+                "x": float(parts[0]),
+                "y": float(parts[1]),
+                "z": float(parts[2]),
+                "element": "".join(ch for ch in parts[3] if ch.isalpha())[:2] or "C",
+            })
+        except ValueError:
+            continue
+
+    bonds: List[Tuple[int, int]] = []
+    bond_start = atom_start + atom_count
+    for line in lines[bond_start:bond_start + bond_count]:
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        try:
+            bonds.append((int(parts[0]), int(parts[1])))
+        except ValueError:
+            continue
+    return atoms, bonds
 
 
 # ─────────────────────────────────────────────────────────────────────────────

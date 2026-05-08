@@ -9,7 +9,7 @@
 5. In SS2, keep `STRUCTURE_MODE="colabfold_af2"` for direct AF2 prediction, or choose `auto`, `af3_results`, `esmfold_api`, or `user_pdb`.
 6. In SS3-SS4, create `phase_a/structure_registry.tsv`.
 7. In SS5, paste one or more SMILES entries.
-8. In SS6-SS8, select protein-ligand pairs, run GNINA, and aggregate results.
+8. In SS6-SS9, select protein-ligand pairs, run GNINA, aggregate results, and export pose visualizations.
 
 ## Structure Modes
 
@@ -65,6 +65,10 @@ LigandA:CCO;LigandB:CCN
 | `phase_b/ligands/*.sdf` | reusable 3D ligand files keyed by SMILES SHA |
 | `phase_b/runs/<case_id>/docked.sdf` | GNINA output per selected pair |
 | `phase_b/docking_master.csv` | append-only selected-pair result table |
+| `phase_b/visualizations/*_contacts.tsv` | contact residues within the selected distance cutoff |
+| `phase_b/visualizations/*_complex.pdb` | merged receptor-ligand complex for external viewers |
+| `phase_b/visualizations/*.cxc` | ChimeraX styling script with contact labels and PNG export command |
+| `phase_b/visualizations/interaction_contacts.tsv` | combined contact-residue table |
 | `manifest.json` | reproducibility footprint |
 
 ## Troubleshooting

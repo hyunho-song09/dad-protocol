@@ -3,55 +3,73 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hyunho-song09/dad-protocol/blob/main/DAD_protocol.ipynb)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-DAD is a reproducible many-to-many protein-metabolite docking workflow for bacterial receptor studies.
+DAD is a user-input protein-ligand docking notebook and code package.
 
-Core features:
+## What It Does
 
-- topology-aware ORF triage before docking;
-- zero-parameter pocket-based docking boxes;
-- Tier 1 replay mode for no-GPU testing;
-- live GNINA docking mode;
-- source-data, figures, tables, and reproducibility metadata.
+- accepts user protein sequence or FASTA;
+- accepts unnamed SMILES or `name:SMILES`;
+- prepares 3D ligand SDF files;
+- uses an existing/uploaded PDB or optional ColabFold prediction;
+- creates an automatic docking box;
+- runs GNINA docking when available;
+- exports ranked results, plots, and a reproducibility JSON.
 
 ## Quick Start
 
-### Colab
+1. Open the Colab notebook.
+2. Run `0. Setup Environment`.
+3. If condacolab restarts the kernel, run all cells again.
+4. Paste your protein sequence in `custom_protein_fasta`.
+5. Paste a SMILES string in `custom_ligand_smiles`.
+6. Keep `STRUCTURE_MODE="colabfold"` to predict from sequence, or provide your own PDB with `existing_or_upload`.
+7. Download `docking_results.tsv` or the result zip.
 
-1. Click `Open In Colab`.
-2. Click `Runtime > Run all`.
-3. If condacolab restarts the kernel, click `Runtime > Run all` again.
-4. Keep `exec_mode = "tier1_replay"` for the fastest smoke test.
+## Input Examples
 
-### Local Tests
+Raw protein sequence:
 
-```bash
-git clone https://github.com/hyunho-song09/dad-protocol.git
-cd dad-protocol/code
-conda create -n dad-lite -c conda-forge python=3.11 rdkit biopython numpy scipy pandas pytest
-conda activate dad-lite
-pytest tests -q
+```text
+MRNMSIFMKVMVIVLILALGMIVIGVYSTFAL...
 ```
 
-## Validation Snapshot
+FASTA:
 
-- Tier 1 replay: 6/6 expected PASS.
-- RCSB seed: 16 cases.
-- Top-pose success: 12/16 at RMSD <= 2.0 A.
-- Best-of-9 success: 15/16 at RMSD <= 2.0 A.
-- CNN score AUROC: 0.958 for top-pose PASS/FAIL.
+```text
+>ProteinA
+MRNMSIFMKVMVIVLILALGMIVIGVYSTFAL...
+```
+
+Unnamed ligand:
+
+```text
+CC[C@H](C)[C@@H](C(=O)O)NC(=O)[C@H](C)N
+```
+
+Named ligand:
+
+```text
+Ala-Ile:CC[C@H](C)[C@@H](C(=O)O)NC(=O)[C@H](C)N
+```
 
 ## Repository Map
 
 | Path | Purpose |
 |---|---|
-| `DAD_protocol.ipynb` | one-click Colab notebook |
+| `DAD_protocol.ipynb` | main Colab notebook |
 | `code/dad/` | Python package |
 | `code/workflow/` | Snakemake workflow |
 | `code/tests/` | unit tests |
-| `figures/` | figures, source code, source data |
-| `tables/` | publication tables |
-| `supplementary/` | supplementary text and data |
-| `submission_metadata/` | submission support files |
+| `figures/`, `tables/`, `supplementary/` | reference examples and documentation assets |
+
+## Local Package Check
+
+```bash
+git clone https://github.com/hyunho-song09/dad-protocol.git
+cd dad-protocol/code
+python -m pip install -e . --no-deps
+python -c "import dad; print(dad.__version__)"
+```
 
 ## License
 

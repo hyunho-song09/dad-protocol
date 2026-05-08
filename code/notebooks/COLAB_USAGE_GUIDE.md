@@ -2,120 +2,112 @@
 
 ## Quick Start
 
-1. Open `DAD_protocol.ipynb` in Colab.
-2. Use GPU only for `live` mode.
-3. Click `Runtime > Run all`.
-4. If Setup installs condacolab, the kernel restarts.
-5. After restart, click `Runtime > Run all` again.
+1. Open `DAD_protocol.ipynb`.
+2. Run `0. Setup Environment`.
+3. If the kernel restarts after condacolab, run all cells again.
+4. Paste your protein sequence or FASTA.
+5. Paste a ligand SMILES string.
+6. Keep `STRUCTURE_MODE="colabfold"` to predict from sequence, or switch to `existing_or_upload` for your own PDB.
+7. Run docking and download the result archive.
 
-## Recommended First Test
+## Progress Bars
 
-Use the defaults:
+Every notebook step prints a progress bar:
 
-- `USE_TIER1_DEFAULT = True`
-- `exec_mode = "tier1_replay"`
-- `INSTALL_GNINA = True` or `False`
+```text
+Setup Environment: [########------------] 50% 4/8 chemistry packages
+```
 
-Tier 1 replay does not need GPU or live GNINA execution.
+Long-running commands such as ColabFold and GNINA still report only step-level progress.
 
-## Setup Cell Behavior
+## Accepted Inputs
 
-The Setup cell does four things:
+Protein sequence:
 
-- installs condacolab on first Colab run;
-- stops after the required kernel restart;
-- installs RDKit/Biopython after restart;
-- downloads and checks GNINA only when `INSTALL_GNINA=True`.
+```text
+MRNMSIFMKVMVIVLILALGMIVIGVYSTFAL...
+```
 
-Expected success messages:
-
-- `Package check: PASS`
-- `GNINA check: PASS` when GNINA is installed
-
-## Input Modes
-
-| Mode | Use case | GPU |
-|---|---|---|
-| `tier1_replay` | Fast smoke test and deterministic replay | No |
-| `live` | Real GNINA docking and structure workflow | Yes |
-
-## Custom Input
-
-Protein FASTA:
+FASTA:
 
 ```text
 >ProteinA
-MKTLLLSVALAGFASAHAA...
+MRNMSIFMKVMVIVLILALGMIVIGVYSTFAL...
 ```
 
-Multiple proteins:
+SMILES:
 
 ```text
->ProtA\nSEQ1;>ProtB\nSEQ2
+CC[C@H](C)[C@@H](C(=O)O)NC(=O)[C@H](C)N
 ```
 
-Ligand SMILES:
+Named SMILES:
 
 ```text
-Ala-Ile:CC(N)C(=O)NC(CC(C)C)C(O)=O;Gly-Val:NCC(=O)NC(C(C)C)C(O)=O
+Ala-Ile:CC[C@H](C)[C@@H](C(=O)O)NC(=O)[C@H](C)N
 ```
 
-## Main Outputs
+Multiple ligands:
+
+```text
+LigandA:CCO;LigandB:CCN
+```
+
+## Structure Options
+
+| Option | Use When |
+|---|---|
+| `existing_or_upload` | You already have PDB/CIF files |
+| `colabfold` | You want ColabFold to predict structures from FASTA |
+
+For `existing_or_upload`, put files in:
+
+```text
+WORK_DIR/structures/
+```
+
+or set:
+
+```text
+EXISTING_PDB_DIR=/path/to/pdbs
+```
+
+The expected file name is `Protein_1.pdb` unless the FASTA header gives another ID.
+
+## Outputs
 
 | File | Content |
 |---|---|
-| `docking_results.tsv` | scores and RMSD by case |
-| `table5_family_coverage.tsv` | family summary |
-| `table6_failure_cases.tsv` | failure-case summary |
-| `figures.zip` | generated figures |
-| `reproducibility_footprint.json` | runtime and package metadata |
+| `results/docking_results.tsv` | ranked docking results |
+| `results/tables/ranked_results.tsv` | same ranked table |
+| `results/tables/protein_summary.tsv` | best score per protein |
+| `results/tables/ligand_summary.tsv` | best score per ligand |
+| `results/figures/*.png` | result plots |
+| `results/reproducibility_footprint.json` | runtime metadata |
+| `<job_name>_results.zip` | result archive |
 
 ## Troubleshooting
 
-### Setup stops after condacolab
+### No ligands parsed
 
-Expected. The kernel was restarted. Run all cells again.
+Paste either raw SMILES or `name:SMILES`. Raw SMILES is now accepted.
 
-### mamba install fails
+### No PDB structures found
 
-The notebook now stops before mamba is called in the old kernel. After restart, rerun all cells. If mamba still fails, the cell falls back to pip for RDKit/Biopython.
+Use one of:
 
-### `libcudnn.so.9` error
+- upload `Protein_1.pdb` to `WORK_DIR/structures`;
+- set `EXISTING_PDB_DIR`;
+- set `STRUCTURE_MODE="colabfold"`.
 
-Rerun Setup with `INSTALL_GNINA=True`. The cell installs CUDA/cuDNN wheels and sets `LD_LIBRARY_PATH`.
+### GNINA not found
+
+Run Setup with:
+
+```python
+INSTALL_GNINA = True
+```
 
 ### GPU quota exceeded
 
-Use:
-
-```python
-exec_mode = "tier1_replay"
-```
-
-### GNINA download fails
-
-Rerun Setup. If it still fails, manually place the binary at:
-
-```text
-/usr/local/bin/gnina
-```
-
-Release URL:
-
-```text
-https://github.com/gnina/gnina/releases/download/v1.3.2/gnina.1.3.2
-```
-
-## Interpretation
-
-- Top-pose RMSD < 2.0 A: PASS.
-- Best-of-9 RMSD is diagnostic only.
-- CNN pose score is useful across cases, but can rank a non-best pose first within one case.
-
-## Tolerances
-
-| Score | Tolerance |
-|---|---|
-| Vina | +/-0.5 kcal/mol |
-| CNN pose | +/-0.05 |
-| CNN affinity | +/-0.5 pKi |
+Use `exec_mode="prepare_only"` to prepare inputs without docking.

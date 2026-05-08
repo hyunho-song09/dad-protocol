@@ -1,0 +1,13 @@
+stage,name,description,input,output,primary_tool,reference
+1,ingest,Read FASTA + SMILES + config; canonicalize identifiers,01_Tier1_input/proteins/*.fasta + ligands/*.smi,results/ingested/proteins.jsonl + ligands.jsonl,Python (pyyaml),Snakefile
+2,qc_derep,Sequence-level quality filter and dereplication,proteins.jsonl,proteins_qc.jsonl,Python (Bio.SeqIO),Snakefile
+3,triage,Pre-docking biological triage with 5 rules (R1 length / R2 SP clip / R3 nTM / R4 dock-region length / R5 functional class),proteins_qc.jsonl,triage_report.tsv with verdict + triage_status columns,DeepTMHMM (default) or Phobius (opt-in),Hallgren 2022; Käll 2007
+4,structure_pred,AlphaFold 2/3 structure prediction or AW1_ref reuse,proteins_qc.jsonl + manifest,results/structures/*.pdb,ColabFold v1.6.1 + AlphaFold 2/3,Mirdita 2022; Jumper 2021; Abramson 2024
+5,pocket_detect,Binding pocket detection or AW1_ref P2Rank reuse,results/structures/*.pdb,results/pockets/*.csv,P2Rank 2.4.2,Krivák 2018
+6,ligand_prep,SMILES to 3D SDF with ETKDGv3 + MMFF,ligands.jsonl,results/ligands/*.sdf,RDKit + Open Babel,O'Boyle 2011 (Open Babel); RDKit (open source)
+7,box_config,Compute docking box (side = max(22 A, ligand_max_dim + 10 A)),pockets/*.csv + ligands/*.sdf,results/boxes/*.json,dad.core.pocket.pocket_to_box,Snakefile
+8,dock,GNINA docking with zero-parameter defaults (exhaustiveness 32, num_modes 9, seed 0),boxes + structures + ligands,results/poses/*.sdf + scores/*.json,GNINA 1.3.2,McNutt 2021
+9,interaction,Bio.PDB contact extraction (5 A) + optional PLIP profiling,poses + receptor PDB,results/interactions/*.tsv,Bio.PDB + PLIP,Hamelryck 2003; Adasme 2021
+10,aggregate,z-score composite ranking and many-to-many matrix assembly,scores + interactions,results/report/docking_master.csv + benchmark/validation_table.tsv,dad.core.interaction.aggregate_results,Snakefile
+11,visualize,py3Dmol HTML + ChimeraX cxc generation; replay-mode placeholder when no docked SDF,poses + receptor + contacts,results/viz/*.html + *.cxc,py3Dmol + ChimeraX,Pettersen 2021
+12,manifest,Tool versions + SHA256 checksums + access dates,all stage outputs,results/manifest.json,Python (hashlib),Snakefile

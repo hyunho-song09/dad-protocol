@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-05-07T16:16:51+00:00",
+  "prepared_manifest": "06_Report/Mr_Repro/external_validation/rcsb_seed/prepared_manifest.tsv",
+  "gnina_requested": "06_Report/Mr_Repro/tools/gnina/run_gnina_wsl.sh",
+  "gnina_resolved": "06_Report/Mr_Repro/tools/gnina/run_gnina_wsl.sh",
+  "case_count": 16,
+  "status_counts": {
+    "PASS": 16
+  },
+  "redock_pass_counts": {
+    "PASS": 12,
+    "FAIL": 4
+  },
+  "best_pose_pass_counts": {
+    "PASS": 15,
+    "FAIL": 1
+  },
+  "result_path": "06_Report/Mr_Repro/external_validation/rcsb_seed/redocking_results.tsv",
+  "parameters": {
+    "exhaustiveness": 32,
+    "num_modes": 9,
+    "seed": 0,
+    "rmsd_pass_threshold_a": 2.0,
+    "rmsd_definition": "receptor-frame in-place heavy-atom RMSD without Kabsch alignment; RDKit symmetry correction when available",
+    "rdkit_available": true,
+    "rdkit_import_error": "",
+    "case_ids": [],
+    "limit": null
+  }
+}

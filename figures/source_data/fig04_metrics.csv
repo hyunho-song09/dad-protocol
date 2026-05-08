@@ -1,0 +1,17 @@
+metric,value
+n,16
+n_pass_top_pose,12
+n_fail_top_pose,4
+pearson_r_top_vs_cnn,-0.889185
+pearson_p_top_vs_cnn,4e-06
+pearson_r_best9_vs_cnn,-0.388481
+pearson_p_best9_vs_cnn,0.137012
+spearman_rho_top_vs_cnn,-0.655882
+spearman_rho_best9_vs_cnn,-0.602941
+auroc,0.958333
+auprc,0.986645
+ef_at_25pct,1.333333
+rmsd_threshold_a,2.0
+source_tsv,D:\project\experiment\DAD\06_Report\Mr_Repro\external_validation\rcsb_seed\redocking_results.tsv
+script,D:\project\experiment\DAD\Publication\figures\source_code\fig04_cnn_roc.py
+generated_at,2026-05-08T00:25:01Z

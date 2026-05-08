@@ -1,0 +1,60 @@
+cff-version: 1.2.0
+message: "If you use DAD in your research, please cite the following."
+type: software
+title: "DAD: Dynamic Affinity Dock — Many-to-Many Protein–Metabolite Docking Workflow"
+version: "0.1.0"
+date-released: "2026-05-08"
+license: MIT
+repository-code: "https://github.com/PLACEHOLDER/dad"
+url: "https://github.com/PLACEHOLDER/dad"
+doi: "10.XXXX/PLACEHOLDER"
+
+abstract: >
+  DAD is a Nature Protocols-style many-to-many protein–metabolite docking
+  workflow for bacterial chemosensory receptors and substrate-binding proteins.
+  It introduces a pre-docking biological triage stage using membrane topology
+  prediction (DeepTMHMM/Phobius) with five decision rules (R1–R5) to
+  automatically select dock-competent ORFs, and a zero-parameter many-to-many
+  matrix producing ranked docking results via GNINA 1.3.2 without user tuning.
+
+authors:
+  - family-names: "PLACEHOLDER_FAMILY"
+    given-names: "PLACEHOLDER_GIVEN"
+    affiliation: "PLACEHOLDER_INSTITUTION"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+
+keywords:
+  - protein-ligand docking
+  - chemosensory receptor
+  - substrate-binding protein
+  - membrane topology prediction
+  - bacterial signaling
+  - GNINA
+  - ColabFold
+  - many-to-many docking matrix
+  - Nature Protocols
+
+references:
+  - type: software
+    title: "GNINA: A deep-learning framework for molecular docking"
+    authors:
+      - family-names: "McNutt"
+        given-names: "Andrew T."
+    doi: "10.1186/s13321-021-00522-2"
+    year: 2021
+    journal: "Journal of Cheminformatics"
+    volume: 13
+    issue: 1
+    start: 43
+
+  - type: article
+    title: "ColabFold: making protein folding accessible to all"
+    authors:
+      - family-names: "Mirdita"
+        given-names: "Milot"
+    doi: "10.1038/s41592-022-01488-1"
+    year: 2022
+    journal: "Nature Methods"
+    volume: 19
+    start: 679
+    end: 682

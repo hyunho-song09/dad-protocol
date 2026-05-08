@@ -1,0 +1,5 @@
+case_id,family,top_rmsd_a,best_rmsd_a,best_pose_index,failure_type,hypothesized_cause,citation
+TAR_ASP_1VLT,mcp_ligand_binding_domain,3.009,1.627,4,ranking,"aspartate zwitterion in narrow electrostatic channel; carboxyl rotational ambiguity makes CNN ranking ambiguous",failure_analysis.md §"TAR_ASP_1VLT"
+MBP_GLC_1ANF,periplasmic_sugar_binding,5.124,3.464,8,search,"venus-flytrap hinge closure of MBP places experimental binding mode outside the rigid-receptor sampling space",failure_analysis.md §"MBP_GLC_1ANF"
+MBP_GLC_3MBP,periplasmic_sugar_binding,5.003,0.626,7,ranking,"same family different crystal form yet result reverses (1ANF vs 3MBP); demonstrates search and ranking are independent failure modes",failure_analysis.md §"MBP_GLC_3MBP"
+RBSB_RIB_3KSM,periplasmic_sugar_binding,12.778,1.572,4,ranking,"severe within-case ranking failure; receptor-frame RMSD exposes the magnitude that Kabsch alignment would have hidden",failure_analysis.md §"RBSB_RIB_3KSM"

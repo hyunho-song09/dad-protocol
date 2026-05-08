@@ -1,0 +1,9 @@
+﻿asset_id	seq_id	gene	stage	asset_type	path	selection_reason	sha256
+MCP_AF2_PDB	NA23_RS01195	mcpB	4	pdb	AW1_ref/structure_MCP.pdb	Tier1 canonical AF2 structure	2844b1f54726c8e4f25bddddb3b409d5607edcf146f871f3b4f9409ab606dcff
+Crp_AF2_PDB	NA23_RS08105	crp	4	pdb	AW1_ref/structure_Crp.pdb	Tier1 canonical AF2 structure	005322a44e9ba3eccb0aa3ee5dfc578e872483906e1572122772a96b912bd273
+Rbs_AF2_PDB	NA23_RS00870	rbsB	4	pdb	AW1_ref/structure_Rbs.pdb	Tier1 canonical AF2 structure	d0483044a2f23e1ae31eb1f41d8b16f5c7df3d65b15f1f4118a56215c1369920
+MCP_P2RANK	NA23_RS01195	mcpB	5	p2rank_csv	AW1_ref/structure.pdb_predictions_MCP.csv	Tier1 canonical P2Rank pocket predictions	a9ad89ce0535770c80bcdf6f5160bbeb202dbfb4c668f95df83c46e175ea7625
+Crp_P2RANK	NA23_RS08105	crp	5	p2rank_csv	AW1_ref/structure.pdb_predictions_Crp.csv	Tier1 canonical P2Rank pocket predictions	62cc17e79ec7ed3e61bccbde145abedead30c90900dfcde8529063306df1c7ce
+Rbs_P2RANK	NA23_RS00870	rbsB	5	p2rank_csv	AW1_ref/structure.pdb_predictions_Rbs.csv	Tier1 canonical P2Rank pocket predictions	27db79db5d0085022cc0547625c552386f8ff630f84dea6440dfbcc5d2a3b06b
+LIGAND_DIPEPTIDES	—	—	2	smiles	01_Tier1_input/ligands/dipeptides.smi	Tier1 canonical ligand SMILES (Ala-Ile, Gly-Val)	c14486a00901f494c9d932b74f2c0ab7d31f57ba7c362f95db5e1791f67527a7
+REVISION_GROUND_TRUTH	—	—	11	tsv_ground_truth	Claude_web/Revision.txt	Tier1 canonical ground truth (Vina/CNN scores)	bc71a77dda26d2e996c5b6a5602abe4911037a544cbc734c09d3352ab21b5ab6

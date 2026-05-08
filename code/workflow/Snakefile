@@ -1,0 +1,1214 @@
+# =============================================================================
+# DAD (Dynamic Affinity Dock) — Snakemake Workflow
+# =============================================================================
+# Stages 0-12 as defined in DAD_project_plan.md
+# B4 integration: all TODO blocks replaced with dad.core function calls.
+# Run: snakemake --dryrun --snakefile Snakefile --configfile config.yaml
+# =============================================================================
+
+import csv
+import json
+import os
+from pathlib import Path
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Workflow root — resolved from Snakefile location so any cwd works.
+# Snakefile lives at <project_root>/06_Report/Mr_Pipeline/Snakefile
+# workflow.snakefile → 06_Report/Mr_Pipeline/Snakefile
+# .parent           → 06_Report/Mr_Pipeline/
+# .parent.parent    → 06_Report/
+# .parent.parent.parent → <project_root>/
+# ─────────────────────────────────────────────────────────────────────────────
+def _find_project_root(start):
+    """Locate the DAD project root from either dev or publication copies."""
+    for candidate in [start, *start.parents]:
+        if (candidate / "06_Report").exists() and (candidate / "01_Tier1_input").exists():
+            return candidate
+    return Path(workflow.snakefile).resolve().parent.parent.parent
+
+
+WORKFLOW_DIR = Path(workflow.snakefile).resolve().parent
+workflow_root = _find_project_root(WORKFLOW_DIR)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+configfile: str(WORKFLOW_DIR / "config.yaml")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Resolve config relative paths against workflow_root
+# ─────────────────────────────────────────────────────────────────────────────
+AW1_REF_MANIFEST  = str(workflow_root / config.get("aw1_ref", {}).get("manifest_path", "06_Report/Mr_Repro/aw1_ref_manifest.tsv"))
+REVISION_TABLE    = str(workflow_root / config.get("benchmark", {}).get("revision_table_path", "Claude_web/Revision.txt"))
+INPUT_FASTA       = str(workflow_root / config["input"]["fasta"])
+INPUT_SMILES      = str(workflow_root / config["input"]["smiles"])
+
+# Convenience aliases
+RESULTS     = "results"
+TRIAGE_DIR  = os.path.join(RESULTS, "triage")
+STRUCT_DIR  = os.path.join(RESULTS, "structures")
+POCKET_DIR  = os.path.join(RESULTS, "pockets")
+LIGAND_DIR  = os.path.join(RESULTS, "ligands")
+DOCK_DIR    = os.path.join(RESULTS, "docking")
+INTER_DIR   = os.path.join(RESULTS, "interactions")
+VIZ_DIR     = os.path.join(RESULTS, "visualization")
+REPORT_DIR  = os.path.join(RESULTS, "report")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Wildcard constraints
+# ─────────────────────────────────────────────────────────────────────────────
+wildcard_constraints:
+    seq_id    = r"[A-Za-z0-9_\-\.]+",
+    lig_id    = r"[A-Za-z0-9_\-\.]+",
+    pocket    = r"[0-9]+",
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helper: load seq_ids and lig_ids from checkpoint outputs
+# ─────────────────────────────────────────────────────────────────────────────
+def get_accepted_seq_ids(wildcards):
+    """Return seq_ids of triage-accepted proteins (reads triage_report.tsv).
+
+    Primary filter: verdict in {"accept", "downrank"} (external I/O schema).
+    Inclusion policy (rationale.md §R5 / priority_action_plan.md M2):
+      PASS / PASS_CLIPPED -> verdict=accept  -> included normally.
+      FLAG                -> verdict=downrank -> included with warning log.
+      EXCLUDE             -> verdict=exclude  -> dropped.
+    """
+    import logging as _log
+    tsv = checkpoints.triage.get().output["tsv"]
+    ids = []
+    with open(str(tsv)) as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            orf_id = row.get("orf_id") or row.get("seq_id", "")
+            verdict = row.get("verdict", "")
+            triage_status = row.get("triage_status") or row.get("status", "")
+
+            if verdict in ("accept", "downrank"):
+                if triage_status == "FLAG" or verdict == "downrank":
+                    _log.getLogger("dad.snakemake").warning(
+                        "ORF %s has triage status FLAG / verdict=downrank "
+                        "(low-confidence annotation); proceeding to Stage 4. "
+                        "Review triage_report.tsv for details.", orf_id
+                    )
+                ids.append(orf_id)
+    return ids
+
+
+def get_lig_ids(wildcards):
+    """Return all lig_ids from the prepared ligands index file."""
+    idx = os.path.join(LIGAND_DIR, "index.txt")
+    if not os.path.exists(idx):
+        return []
+    return [line.strip() for line in open(idx) if line.strip()]
+
+
+def expand_docking_outputs(wildcards):
+    """Expand docking SDF outputs for all (seq_id × lig_id × pocket) combos."""
+    seq_ids = get_accepted_seq_ids(wildcards)
+    lig_ids = get_lig_ids(wildcards)
+    top_n   = config["pocket"]["top_n_pockets"]
+    return expand(
+        os.path.join(DOCK_DIR, "{seq_id}", "{lig_id}", "pocket{pocket}", "docked.sdf"),
+        seq_id=seq_ids,
+        lig_id=lig_ids,
+        pocket=range(1, top_n + 1),
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 0-1 — Input ingestion & validation
+# ─────────────────────────────────────────────────────────────────────────────
+rule ingest:
+    """Stage 1: Validate and index input FASTA and SMILES files.
+
+    Reads multi-FASTA translations and a SMILES CSV.
+    Writes:
+      - ingest/proteins.jsonl  — one JSON record per ProteinInput
+      - ingest/ligands.jsonl   — one JSON record per LigandInput
+      - ingest/summary.txt     — counts and basic QC stats
+    """
+    input:
+        fasta  = INPUT_FASTA,
+        smiles = INPUT_SMILES,
+    output:
+        proteins_jsonl = os.path.join(RESULTS, "ingest", "proteins.jsonl"),
+        ligands_jsonl  = os.path.join(RESULTS, "ingest", "ligands.jsonl"),
+        summary        = os.path.join(RESULTS, "ingest", "summary.txt"),
+    params:
+        organism              = config["input"].get("organism", ""),
+        expected_localization = config["input"].get("expected_localization", ""),
+    log:
+        os.path.join(RESULTS, "logs", "ingest.log"),
+    threads: 1
+    run:
+        from dad.io import ProteinInput, LigandInput
+
+        # --- Parse proteins from FASTA ---
+        proteins = []
+        try:
+            from Bio import SeqIO
+            for rec in SeqIO.parse(input.fasta, "fasta"):
+                p = ProteinInput(
+                    seq_id=str(rec.id),
+                    sequence=str(rec.seq),
+                    source_file=str(Path(input.fasta).resolve()),
+                    description=str(rec.description),
+                    organism=params.organism or None,
+                )
+                proteins.append(p)
+        except ImportError:
+            # Pure-Python FASTA parser fallback
+            seq_id = desc = seq_lines = None
+            for line in open(input.fasta):
+                line = line.rstrip()
+                if line.startswith(">"):
+                    if seq_id and seq_lines:
+                        proteins.append(ProteinInput(
+                            seq_id=seq_id, sequence="".join(seq_lines),
+                            source_file=str(Path(input.fasta).resolve()),
+                            description=desc, organism=params.organism or None,
+                        ))
+                    parts = line[1:].split(None, 1)
+                    seq_id = parts[0]
+                    desc = parts[1] if len(parts) > 1 else None
+                    seq_lines = []
+                elif seq_id is not None:
+                    seq_lines.append(line)
+            if seq_id and seq_lines:
+                proteins.append(ProteinInput(
+                    seq_id=seq_id, sequence="".join(seq_lines),
+                    source_file=str(Path(input.fasta).resolve()),
+                    description=desc, organism=params.organism or None,
+                ))
+
+        # --- Parse ligands from SMILES file ---
+        ligands = []
+        src = str(Path(input.smiles).resolve())
+        for line in open(input.smiles):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) >= 2:
+                smiles, lig_id = parts[0], parts[1]
+            else:
+                smiles = parts[0]
+                lig_id = f"lig_{len(ligands)+1}"
+            ligands.append(LigandInput(lig_id=lig_id, smiles=smiles, source_file=src))
+
+        # --- Write outputs ---
+        Path(output.proteins_jsonl).parent.mkdir(parents=True, exist_ok=True)
+        with open(output.proteins_jsonl, "w") as f:
+            for p in proteins:
+                f.write(json.dumps(p.to_dict()) + "\n")
+
+        with open(output.ligands_jsonl, "w") as f:
+            for lig in ligands:
+                f.write(json.dumps(lig.to_dict()) + "\n")
+
+        # Write ligand index for downstream get_lig_ids()
+        lig_idx = Path(LIGAND_DIR) / "index.txt"
+        lig_idx.parent.mkdir(parents=True, exist_ok=True)
+        lig_idx.write_text("\n".join(l.lig_id for l in ligands) + "\n")
+
+        with open(output.summary, "w") as f:
+            f.write(f"proteins: {len(proteins)}\nligands: {len(ligands)}\n")
+
+        with open(log[0], "w") as lf:
+            lf.write(f"Ingested {len(proteins)} proteins, {len(ligands)} ligands.\n")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2 — Sequence QC & dereplication
+# ─────────────────────────────────────────────────────────────────────────────
+rule qc_derep:
+    """Stage 2: Filter low-quality sequences and cluster at ≥95% identity.
+
+    Reads:
+      - ingest/proteins.jsonl
+    Writes:
+      - qc/proteins_qc.jsonl    — post-filter, post-cluster proteins
+      - qc/clusters.tsv         — cluster membership table
+      - qc/qc_report.txt        — n_input, n_filtered stats
+    """
+    input:
+        proteins_jsonl = rules.ingest.output.proteins_jsonl,
+    output:
+        proteins_qc = os.path.join(RESULTS, "qc", "proteins_qc.jsonl"),
+        clusters    = os.path.join(RESULTS, "qc", "clusters.tsv"),
+        report      = os.path.join(RESULTS, "qc", "qc_report.txt"),
+    params:
+        min_length         = config["qc"]["min_length"],
+        max_length         = config["qc"]["max_length"],
+        identity_threshold = config["qc"]["identity_threshold"],
+        coverage           = config["qc"]["coverage"],
+    log:
+        os.path.join(RESULTS, "logs", "qc_derep.log"),
+    threads: config["resources"]["threads_default"]
+    run:
+        from dad.io import ProteinInput
+
+        proteins = []
+        with open(input.proteins_jsonl) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    proteins.append(ProteinInput.from_dict(json.loads(line)))
+
+        # Length filter (MMseqs2 clustering deferred to Colab runner for large sets)
+        filtered = [
+            p for p in proteins
+            if params.min_length <= len(p.sequence) <= params.max_length
+        ]
+
+        Path(output.proteins_qc).parent.mkdir(parents=True, exist_ok=True)
+        with open(output.proteins_qc, "w") as f:
+            for p in filtered:
+                f.write(json.dumps(p.to_dict()) + "\n")
+
+        with open(output.clusters, "w") as f:
+            f.write("representative\tmember\n")
+            for p in filtered:
+                f.write(f"{p.seq_id}\t{p.seq_id}\n")
+
+        with open(output.report, "w") as f:
+            f.write(
+                f"n_input: {len(proteins)}\n"
+                f"n_filtered: {len(filtered)}\n"
+                f"n_excluded_length: {len(proteins) - len(filtered)}\n"
+            )
+
+        with open(log[0], "w") as lf:
+            lf.write(f"QC: {len(proteins)} in, {len(filtered)} retained.\n")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 3 — Pre-docking biological triage  (checkpoint: creates seq_id list)
+# ─────────────────────────────────────────────────────────────────────────────
+checkpoint triage:
+    """Stage 3: Biological triage — topology prediction + functional annotation.
+
+    This is DAD's primary novelty. See dad.core.triage for the decision tree.
+
+    Reads:
+      - qc/proteins_qc.jsonl
+    Writes:
+      - triage/triage_report.tsv   — per-ORF verdict (TriageRecord TSV)
+      - triage/triage_pass.fasta   — dock-eligible sequences for Stage 4
+    """
+    input:
+        proteins_qc = rules.qc_derep.output.proteins_qc,
+    output:
+        tsv          = os.path.join(TRIAGE_DIR, "triage_report.tsv"),
+        pass_fasta   = os.path.join(TRIAGE_DIR, "triage_pass.fasta"),
+        topology_dir = directory(os.path.join(TRIAGE_DIR, "topology")),
+        annot_dir    = directory(os.path.join(TRIAGE_DIR, "annotation")),
+    params:
+        tool       = config["triage"]["topology_tool"],
+        source_tier = "Tier1",
+    log:
+        os.path.join(RESULTS, "logs", "triage.log"),
+    threads: config["resources"]["threads_default"]
+    run:
+        from dad.io import ProteinInput
+        from dad.core.triage import snakemake_triage_main, TriageConfig, run_triage
+
+        # Rebuild FASTA from proteins_qc.jsonl for snakemake_triage_main
+        proteins = []
+        with open(input.proteins_qc) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    proteins.append(ProteinInput.from_dict(json.loads(line)))
+
+        # Write temporary FASTA for triage entry point
+        import tempfile
+        Path(output.topology_dir).mkdir(parents=True, exist_ok=True)
+        Path(output.annot_dir).mkdir(parents=True, exist_ok=True)
+
+        tmp_fasta = Path(output.topology_dir) / "input_for_triage.fasta"
+        with open(tmp_fasta, "w") as fh:
+            for p in proteins:
+                fh.write(f">{p.seq_id}\n{p.sequence}\n")
+
+        snakemake_triage_main(
+            input_fasta=str(tmp_fasta),
+            output_tsv=output.tsv,
+            output_fasta=output.pass_fasta,
+            triage_tool=params.tool,
+            source_tier=params.source_tier,
+        )
+
+        with open(log[0], "w") as lf:
+            lf.write(f"Triage complete. Report: {output.tsv}\n")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 4 — Structure prediction (one job per accepted seq_id)
+# ─────────────────────────────────────────────────────────────────────────────
+rule structure_pred:
+    """Stage 4: ColabFold / AlphaFold2 structure prediction for one ORF.
+
+    AW1_ref reuse: if AW1_ref/structure_{MCP,Crp,Rbs}.pdb exists for this
+    seq_id, it is loaded directly without re-running ColabFold.
+
+    Reads:
+      - triage/triage_pass.fasta       (dock-trimmed sequences)
+      - triage/triage_report.tsv       (dock_region_start/end)
+    Writes:
+      - structures/{seq_id}/rank_1.pdb
+      - structures/{seq_id}/quality.json
+      - structures/{seq_id}/dock_region.pdb
+    """
+    input:
+        pass_fasta    = os.path.join(TRIAGE_DIR, "triage_pass.fasta"),
+        triage_report = os.path.join(TRIAGE_DIR, "triage_report.tsv"),
+    output:
+        rank1_pdb   = os.path.join(STRUCT_DIR, "{seq_id}", "rank_1.pdb"),
+        quality_json = os.path.join(STRUCT_DIR, "{seq_id}", "quality.json"),
+        dock_region  = os.path.join(STRUCT_DIR, "{seq_id}", "dock_region.pdb"),
+    params:
+        job_dir        = os.path.join(STRUCT_DIR, "{seq_id}"),
+        model_type     = config["structure"]["model_type"],
+        msa_mode       = config["structure"]["msa_mode"],
+        num_recycles   = config["structure"]["num_recycles"],
+        num_seeds      = config["structure"]["num_seeds"],
+        num_models     = config["structure"]["num_models"],
+        use_dropout    = config["structure"]["use_dropout"],
+        use_amber      = config["structure"]["use_amber"],
+        template_mode  = config["structure"]["template_mode"],
+        plddt_min      = config["structure"]["plddt_min"],
+        exec_mode      = config.get("execution", {}).get("mode", "live"),
+        manifest_path  = AW1_REF_MANIFEST,
+    log:
+        os.path.join(RESULTS, "logs", "structure_pred_{seq_id}.log"),
+    threads: config["resources"]["threads_default"]
+    run:
+        from dad.core.structure import (
+            load_aw1_asset, load_existing_pdb, run_colabfold,
+            assess_structure_quality, select_dock_region_pdb,
+        )
+        import shutil
+
+        seq_id = wildcards.seq_id
+        Path(params.job_dir).mkdir(parents=True, exist_ok=True)
+
+        # --- Read dock_region coords from triage report ---
+        dock_start = dock_end = None
+        with open(input.triage_report) as f:
+            reader = csv.DictReader(f, delimiter="\t")
+            for row in reader:
+                row_id = row.get("orf_id") or row.get("seq_id", "")
+                if row_id == seq_id:
+                    s = row.get("dock_region_start", "")
+                    e = row.get("dock_region_end", "")
+                    if s and s != "0":
+                        dock_start = int(s)
+                    if e and e != "0":
+                        dock_end = int(e)
+                    break
+
+        # --- AW1_ref reuse: manifest-driven (M1/M3) with fallback map ---
+        aw1_pdb = None
+        asset_id_map = {
+            "NA23_RS01195": "MCP_AF2_PDB",
+            "NA23_RS01195_mcpB": "MCP_AF2_PDB",
+            "NA23_RS08105": "Crp_AF2_PDB",
+            "NA23_RS08105_crp": "Crp_AF2_PDB",
+            "NA23_RS00870": "Rbs_AF2_PDB",
+            "NA23_RS00870_rbsB": "Rbs_AF2_PDB",
+        }
+        for key, asset_id in asset_id_map.items():
+            if key in seq_id:
+                try:
+                    resolved = load_aw1_asset(asset_id, Path(params.manifest_path))
+                    if resolved.exists():
+                        aw1_pdb = str(resolved)
+                except Exception:
+                    pass
+                break
+
+        if aw1_pdb or params.exec_mode == "tier1_replay":
+            if aw1_pdb is None:
+                raise ValueError(
+                    f"tier1_replay: no AW1_ref PDB found for {seq_id} via manifest "
+                    f"{params.manifest_path}"
+                )
+            sp = load_existing_pdb(aw1_pdb, seq_id, plddt_min=params.plddt_min)
+            shutil.copy2(aw1_pdb, output.rank1_pdb)
+        else:
+            # ColabFold (Colab environment required for live mode)
+            sequence = None
+            try:
+                from Bio import SeqIO
+                for rec in SeqIO.parse(input.pass_fasta, "fasta"):
+                    if str(rec.id) == seq_id or str(rec.id).split("|")[0] == seq_id:
+                        sequence = str(rec.seq)
+                        break
+            except ImportError:
+                cur_id = cur_seq = None
+                for line in open(input.pass_fasta):
+                    line = line.rstrip()
+                    if line.startswith(">"):
+                        cur_id = line[1:].split("|")[0].split()[0]
+                        cur_seq = []
+                    elif cur_id == seq_id and cur_seq is not None:
+                        cur_seq.append(line)
+                if cur_seq:
+                    sequence = "".join(cur_seq)
+
+            if sequence is None:
+                raise ValueError(f"Sequence for {seq_id} not found in {input.pass_fasta}")
+
+            run_colabfold(
+                seq_id=seq_id, sequence=sequence, job_dir=params.job_dir,
+                model_type=params.model_type, msa_mode=params.msa_mode,
+                num_recycles=params.num_recycles, num_seeds=params.num_seeds,
+                num_models=params.num_models, use_dropout=params.use_dropout,
+                use_amber=params.use_amber, template_mode=params.template_mode,
+            )
+            from dad.core.structure import _find_rank1_pdb
+            rank1 = _find_rank1_pdb(params.job_dir, seq_id)
+            shutil.copy2(rank1, output.rank1_pdb)
+
+        quality = assess_structure_quality(output.rank1_pdb, plddt_min=params.plddt_min)
+        with open(output.quality_json, "w") as f:
+            json.dump({**quality, "seq_id": seq_id}, f, indent=2)
+
+        select_dock_region_pdb(
+            pdb_path=output.rank1_pdb,
+            dock_region_start=dock_start,
+            dock_region_end=dock_end,
+            output_path=output.dock_region,
+        )
+
+        with open(log[0], "w") as lf:
+            lf.write(f"{seq_id}: pLDDT={quality['mean_plddt']:.1f}, "
+                     f"dock_region=[{dock_start}:{dock_end}]\n")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 5 — Pocket detection (one job per accepted seq_id)
+# ─────────────────────────────────────────────────────────────────────────────
+rule pocket_detect:
+    """Stage 5: P2Rank pocket detection on dock-region PDB.
+
+    AW1_ref reuse: loads predictions CSV directly if available.
+
+    Reads:
+      - structures/{seq_id}/dock_region.pdb
+    Writes:
+      - pockets/{seq_id}/predictions.csv
+      - pockets/{seq_id}/pockets.jsonl
+    """
+    input:
+        dock_region = os.path.join(STRUCT_DIR, "{seq_id}", "dock_region.pdb"),
+    output:
+        predictions = os.path.join(POCKET_DIR, "{seq_id}", "predictions.csv"),
+        pockets_jl  = os.path.join(POCKET_DIR, "{seq_id}", "pockets.jsonl"),
+    params:
+        p2rank_out    = os.path.join(POCKET_DIR, "{seq_id}"),
+        p2rank_path   = config["pocket"]["p2rank_path"],
+        alphafold     = config["pocket"]["alphafold_mode"],
+        top_n         = config["pocket"]["top_n_pockets"],
+        min_score     = config["pocket"]["min_score"],
+        exec_mode     = config.get("execution", {}).get("mode", "live"),
+        manifest_path = AW1_REF_MANIFEST,
+    log:
+        os.path.join(RESULTS, "logs", "pocket_detect_{seq_id}.log"),
+    threads: 1
+    run:
+        from dad.core.pocket import (
+            run_p2rank, parse_p2rank_output, load_existing_predictions_csv,
+        )
+        from dad.core.structure import load_aw1_asset
+        import shutil
+
+        seq_id = wildcards.seq_id
+        Path(params.p2rank_out).mkdir(parents=True, exist_ok=True)
+
+        # AW1_ref reuse: manifest-driven (M1/M3) with fallback
+        asset_id_map = {
+            "NA23_RS01195": "MCP_P2RANK",
+            "NA23_RS01195_mcpB": "MCP_P2RANK",
+            "NA23_RS08105": "Crp_P2RANK",
+            "NA23_RS08105_crp": "Crp_P2RANK",
+            "NA23_RS00870": "Rbs_P2RANK",
+            "NA23_RS00870_rbsB": "Rbs_P2RANK",
+        }
+        aw1_csv = None
+        for key, asset_id in asset_id_map.items():
+            if key in seq_id:
+                try:
+                    resolved = load_aw1_asset(asset_id, Path(params.manifest_path))
+                    if resolved.exists():
+                        aw1_csv = str(resolved)
+                except Exception:
+                    pass
+                break
+
+        if aw1_csv or params.exec_mode == "tier1_replay":
+            if aw1_csv is None:
+                raise ValueError(
+                    f"tier1_replay: no AW1_ref P2Rank CSV found for {seq_id} via manifest "
+                    f"{params.manifest_path}"
+                )
+            shutil.copy2(aw1_csv, output.predictions)
+            pockets = load_existing_predictions_csv(
+                predictions_csv=aw1_csv, seq_id=seq_id,
+                top_n=params.top_n, min_score=params.min_score,
+            )
+        else:
+            pred_csv = run_p2rank(
+                pdb_path=input.dock_region,
+                output_dir=params.p2rank_out,
+                p2rank_path=params.p2rank_path,
+                alphafold_mode=params.alphafold,
+                top_n=params.top_n,
+            )
+            shutil.copy2(pred_csv, output.predictions)
+            pockets = parse_p2rank_output(
+                predictions_csv=pred_csv, seq_id=seq_id,
+                top_n=params.top_n, min_score=params.min_score,
+            )
+
+        with open(output.pockets_jl, "w") as f:
+            for p in pockets:
+                f.write(json.dumps(p.to_dict()) + "\n")
+
+        with open(log[0], "w") as lf:
+            lf.write(f"{seq_id}: {len(pockets)} pockets detected.\n")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 6 — Ligand preparation (one job per lig_id)
+# ─────────────────────────────────────────────────────────────────────────────
+rule ligand_prep:
+    """Stage 6: Prepare a single SMILES as a 3D docking-ready SDF.
+
+    Reads:
+      - ingest/ligands.jsonl   (for SMILES lookup by lig_id)
+    Writes:
+      - ligands/{lig_id}/prepared.sdf
+      - ligands/{lig_id}/meta.json
+    """
+    input:
+        ligands_jsonl = rules.ingest.output.ligands_jsonl,
+    output:
+        prepared_sdf = os.path.join(LIGAND_DIR, "{lig_id}", "prepared.sdf"),
+        meta_json    = os.path.join(LIGAND_DIR, "{lig_id}", "meta.json"),
+    params:
+        ph             = config["ligand"]["ph"],
+        force_field    = config["ligand"]["force_field"],
+        add_hydrogens  = config["ligand"]["add_hydrogens"],
+        enum_tautomers = config["ligand"]["enumerate_tautomers"],
+        enum_stereo    = config["ligand"]["enumerate_stereo"],
+    log:
+        os.path.join(RESULTS, "logs", "ligand_prep_{lig_id}.log"),
+    threads: 1
+    run:
+        from dad.io import LigandInput
+        from dad.core.docking import smiles_to_3d_sdf
+
+        lig_id = wildcards.lig_id
+
+        # Find SMILES for this lig_id
+        smiles = None
+        with open(input.ligands_jsonl) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                rec = LigandInput.from_dict(json.loads(line))
+                if rec.lig_id == lig_id:
+                    smiles = rec.smiles
+                    break
+
+        if smiles is None:
+            raise ValueError(f"lig_id '{lig_id}' not found in {input.ligands_jsonl}")
+
+        Path(output.prepared_sdf).parent.mkdir(parents=True, exist_ok=True)
+        prepared = smiles_to_3d_sdf(
+            smiles=smiles,
+            lig_id=lig_id,
+            output_sdf=output.prepared_sdf,
+            force_field=params.force_field,
+            ph=params.ph,
+            add_hydrogens=params.add_hydrogens,
+            enumerate_tautomers=params.enum_tautomers,
+            enumerate_stereo=params.enum_stereo,
+        )
+
+        with open(output.meta_json, "w") as f:
+            json.dump(prepared.to_dict(), f, indent=2)
+
+        with open(log[0], "w") as lf:
+            lf.write(f"{lig_id}: MW={prepared.mol_weight:.1f}, max_dim={prepared.max_dim:.2f} Å\n")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 7 — Auto box configuration  (one job per seq_id × lig_id × pocket)
+# ─────────────────────────────────────────────────────────────────────────────
+rule box_config:
+    """Stage 7: Compute GNINA docking box for one (protein × ligand × pocket).
+
+    Box sizing (zero-tuning):
+        side = max(22 Å, ligand_max_dim + 10 Å)
+
+    Reads:
+      - pockets/{seq_id}/pockets.jsonl
+      - ligands/{lig_id}/meta.json
+    Writes:
+      - docking/{seq_id}/{lig_id}/pocket{pocket}/box.json
+    """
+    input:
+        pockets_jl = os.path.join(POCKET_DIR, "{seq_id}", "pockets.jsonl"),
+        meta_json  = os.path.join(LIGAND_DIR, "{lig_id}", "meta.json"),
+    output:
+        box_json   = os.path.join(DOCK_DIR, "{seq_id}", "{lig_id}", "pocket{pocket}", "box.json"),
+    params:
+        box_size_min = config["docking"]["box_size_min"],
+        box_padding  = config["docking"]["box_padding"],
+    log:
+        os.path.join(RESULTS, "logs", "box_config_{seq_id}_{lig_id}_p{pocket}.log"),
+    threads: 1
+    run:
+        from dad.io import PocketResult, PreparedLigand
+        from dad.core.pocket import pocket_to_box
+
+        pocket_rank = int(wildcards.pocket)
+
+        # Load target pocket
+        target_pocket = None
+        with open(input.pockets_jl) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                p = PocketResult.from_dict(json.loads(line))
+                if p.pocket_rank == pocket_rank:
+                    target_pocket = p
+                    break
+
+        if target_pocket is None:
+            raise ValueError(
+                f"Pocket rank {pocket_rank} not found in {input.pockets_jl}"
+            )
+
+        with open(input.meta_json) as f:
+            lig_meta = PreparedLigand.from_dict(json.load(f))
+
+        box = pocket_to_box(
+            pocket=target_pocket,
+            ligand_max_dim=lig_meta.max_dim,
+            box_size_min=params.box_size_min,
+            box_padding=params.box_padding,
+        )
+
+        Path(output.box_json).parent.mkdir(parents=True, exist_ok=True)
+        with open(output.box_json, "w") as f:
+            json.dump(box, f, indent=2)
+
+        with open(log[0], "w") as lf:
+            lf.write(
+                f"{wildcards.seq_id} x {wildcards.lig_id} pocket{pocket_rank}: "
+                f"center=({box['center_x']:.2f},{box['center_y']:.2f},{box['center_z']:.2f}) "
+                f"size={box['size_x']:.1f} Å\n"
+            )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 8 — GNINA docking  (one job per seq_id × lig_id × pocket)
+# ─────────────────────────────────────────────────────────────────────────────
+rule dock:
+    """Stage 8: Run GNINA docking for one (protein × ligand × pocket).
+
+    GNINA runs in Colab (Linux + GPU). In dry-run mode the shell block is
+    validated but not executed.
+
+    Reads:
+      - structures/{seq_id}/dock_region.pdb
+      - ligands/{lig_id}/prepared.sdf
+      - docking/{seq_id}/{lig_id}/pocket{pocket}/box.json
+    Writes:
+      - docking/{seq_id}/{lig_id}/pocket{pocket}/docked.sdf
+      - docking/{seq_id}/{lig_id}/pocket{pocket}/scores.json
+    """
+    input:
+        receptor  = os.path.join(STRUCT_DIR, "{seq_id}", "dock_region.pdb"),
+        ligand    = os.path.join(LIGAND_DIR, "{lig_id}", "prepared.sdf"),
+        box_json  = os.path.join(DOCK_DIR, "{seq_id}", "{lig_id}", "pocket{pocket}", "box.json"),
+    output:
+        docked_sdf  = os.path.join(DOCK_DIR, "{seq_id}", "{lig_id}", "pocket{pocket}", "docked.sdf"),
+        scores_json = os.path.join(DOCK_DIR, "{seq_id}", "{lig_id}", "pocket{pocket}", "scores.json"),
+    params:
+        gnina_path          = config["docking"]["gnina_path"],
+        exhaustiveness      = config["docking"]["exhaustiveness"],
+        num_modes           = config["docking"]["num_modes"],
+        seed                = config["docking"]["seed"],
+        cnn_scoring         = config["docking"]["cnn_scoring"],
+        addH                = config["docking"]["addH"],
+        exec_mode           = config.get("execution", {}).get("mode", "live"),
+        revision_table_path = REVISION_TABLE,
+    log:
+        os.path.join(RESULTS, "logs", "dock_{seq_id}_{lig_id}_p{pocket}.log"),
+    threads: config["resources"]["threads_default"]
+    run:
+        from dad.io import DockingBox
+        from dad.core.docking import run_gnina_single, replay_from_ground_truth
+
+        with open(input.box_json) as f:
+            bdata = json.load(f)
+
+        box = DockingBox(
+            seq_id=wildcards.seq_id,
+            lig_id=wildcards.lig_id,
+            pocket_rank=int(wildcards.pocket),
+            center_x=bdata["center_x"], center_y=bdata["center_y"], center_z=bdata["center_z"],
+            size_x=bdata["size_x"], size_y=bdata["size_y"], size_z=bdata["size_z"],
+        )
+
+        if params.exec_mode == "tier1_replay":
+            # Replay mode: ingest ground-truth scores; no GNINA subprocess.
+            result = replay_from_ground_truth(
+                case_id=wildcards.seq_id,
+                revision_table_path=Path(params.revision_table_path),
+                ligand_id=wildcards.lig_id,
+                pocket_rank=int(wildcards.pocket),
+            )
+            # Write sentinel SDF so downstream rules have a consistent path
+            Path(output.docked_sdf).parent.mkdir(parents=True, exist_ok=True)
+            Path(output.docked_sdf).write_text(
+                "# replay mode: no docked pose — scores from Revision.txt ground truth\n"
+            )
+        else:
+            result = run_gnina_single(
+                receptor_pdb=input.receptor,
+                ligand_sdf=input.ligand,
+                box=box,
+                output_sdf=output.docked_sdf,
+                gnina_path=params.gnina_path,
+                exhaustiveness=params.exhaustiveness,
+                num_modes=params.num_modes,
+                seed=params.seed,
+                cnn_scoring=params.cnn_scoring,
+                addH=params.addH,
+            )
+
+        with open(output.scores_json, "w") as f:
+            json.dump(result.to_dict(), f, indent=2)
+
+        with open(log[0], "w") as lf:
+            bp = result.best_pose
+            mode_tag = "[replay]" if params.exec_mode == "tier1_replay" else "[live]"
+            lf.write(
+                f"{mode_tag} {wildcards.seq_id} x {wildcards.lig_id} pocket{wildcards.pocket}: "
+                f"vina={bp.vina_affinity:.3f} cnn_pose={bp.cnn_pose_score:.4f} "
+                f"cnn_aff={bp.cnn_affinity:.3f}\n"
+            )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 9 — Interaction profiling (one job per seq_id × lig_id × pocket)
+# ─────────────────────────────────────────────────────────────────────────────
+rule interaction:
+    """Stage 9: Contact residue extraction + PLIP interaction classification.
+
+    5 Å contact residues (Bio.PDB) + PLIP H-bond / hydrophobic / π-stack.
+
+    Reads:
+      - structures/{seq_id}/dock_region.pdb
+      - docking/{seq_id}/{lig_id}/pocket{pocket}/docked.sdf
+    Writes:
+      - interactions/{seq_id}/{lig_id}/pocket{pocket}/contacts.jsonl
+      - interactions/{seq_id}/{lig_id}/pocket{pocket}/plip.xml
+      - interactions/{seq_id}/{lig_id}/pocket{pocket}/profile.json
+    """
+    input:
+        receptor   = os.path.join(STRUCT_DIR, "{seq_id}", "dock_region.pdb"),
+        docked_sdf = os.path.join(DOCK_DIR, "{seq_id}", "{lig_id}", "pocket{pocket}", "docked.sdf"),
+        scores_json = os.path.join(DOCK_DIR, "{seq_id}", "{lig_id}", "pocket{pocket}", "scores.json"),
+    output:
+        contacts  = os.path.join(INTER_DIR, "{seq_id}", "{lig_id}", "pocket{pocket}", "contacts.jsonl"),
+        plip_xml  = os.path.join(INTER_DIR, "{seq_id}", "{lig_id}", "pocket{pocket}", "plip.xml"),
+        profile   = os.path.join(INTER_DIR, "{seq_id}", "{lig_id}", "pocket{pocket}", "profile.json"),
+    params:
+        contact_distance = config["interaction"]["contact_distance"],
+        use_plip         = config["interaction"]["use_plip"],
+        plip_path        = config["interaction"]["plip_path"],
+    log:
+        os.path.join(RESULTS, "logs", "interaction_{seq_id}_{lig_id}_p{pocket}.log"),
+    threads: 1
+    run:
+        from dad.io import InteractionProfile
+        from dad.core.interaction import extract_contact_residues, run_plip
+
+        Path(output.contacts).parent.mkdir(parents=True, exist_ok=True)
+
+        contacts = extract_contact_residues(
+            receptor_pdb=input.receptor,
+            docked_sdf=input.docked_sdf,
+            pose_index=0,
+            contact_distance=params.contact_distance,
+        )
+
+        with open(output.contacts, "w") as f:
+            for c in contacts:
+                f.write(json.dumps(c.to_dict()) + "\n")
+
+        # PLIP (optional)
+        n_hbonds = n_hydrophobic = None
+        plip_xml_path = None
+        if params.use_plip:
+            try:
+                plip_result = run_plip(
+                    receptor_pdb=input.receptor,
+                    docked_sdf=input.docked_sdf,
+                    output_xml=output.plip_xml,
+                    plip_path=params.plip_path,
+                )
+                n_hbonds = plip_result.get("n_hbonds")
+                n_hydrophobic = plip_result.get("n_hydrophobic")
+                plip_xml_path = output.plip_xml
+            except Exception as e:
+                with open(output.plip_xml, "w") as f:
+                    f.write(f"<!-- PLIP skipped: {e} -->\n")
+        else:
+            with open(output.plip_xml, "w") as f:
+                f.write("<!-- PLIP disabled in config -->\n")
+
+        profile = InteractionProfile(
+            seq_id=wildcards.seq_id,
+            lig_id=wildcards.lig_id,
+            pocket_rank=int(wildcards.pocket),
+            pose_rank=1,
+            contact_residues=contacts,
+            n_hbonds=n_hbonds,
+            n_hydrophobic=n_hydrophobic,
+            plip_xml_path=plip_xml_path,
+        )
+
+        with open(output.profile, "w") as f:
+            json.dump(profile.to_dict(), f, indent=2)
+
+        with open(log[0], "w") as lf:
+            lf.write(
+                f"{wildcards.seq_id} x {wildcards.lig_id} pocket{wildcards.pocket}: "
+                f"{len(contacts)} contacts, hbonds={n_hbonds}, hydrophobic={n_hydrophobic}\n"
+            )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 10 — Aggregation & ranking
+# ─────────────────────────────────────────────────────────────────────────────
+rule aggregate:
+    """Stage 10: Build master ranking table across all (protein × ligand × pocket).
+
+    Composite score: z(vina)*w1 + z(cnn_pose)*w2 + z(cnn_aff)*w3  (default w=1).
+
+    Reads:
+      - docking/**/scores.json
+      - interactions/**/profile.json
+    Writes:
+      - report/docking_master.csv             (both modes)
+      - report/heatmap_cnn_affinity.csv       (both modes)
+      - benchmark/validation_table.tsv        (both modes; Revision.txt delta in replay)
+    """
+    input:
+        all_docked  = expand_docking_outputs,
+        triage_tsv  = os.path.join(TRIAGE_DIR, "triage_report.tsv"),
+    output:
+        master_csv       = os.path.join(REPORT_DIR, "docking_master.csv"),
+        heatmap_csv      = os.path.join(REPORT_DIR, "heatmap_cnn_affinity.csv"),
+        validation_table = os.path.join(RESULTS, "benchmark", "validation_table.tsv"),
+    params:
+        weights    = config["ranking"]["score_weights"],
+        top_k      = config["ranking"]["top_k"],
+        dock_dir   = DOCK_DIR,
+        inter_dir  = INTER_DIR,
+        exec_mode  = config.get("execution", {}).get("mode", "live"),
+    log:
+        os.path.join(RESULTS, "logs", "aggregate.log"),
+    threads: 1
+    run:
+        import csv as _csv
+        from dad.io import DockingResult, InteractionProfile
+        from dad.core.interaction import aggregate_results, write_master_csv, build_heatmap_matrix
+
+        # Ground truth for validation table (Revision.txt canonical values)
+        _GROUND_TRUTH = {
+            ("NA23_RS01195", "Ala-Ile"): (-5.61, 0.8995, 4.416),
+            ("NA23_RS01195", "Gly-Val"): (-5.18, 0.8468, 4.022),
+            ("NA23_RS08105", "Ala-Ile"): (-6.01, 0.6228, 4.642),
+            ("NA23_RS08105", "Gly-Val"): (-5.59, 0.7353, 4.574),
+            ("NA23_RS00870", "Ala-Ile"): (-4.92, 0.4447, 3.516),
+            ("NA23_RS00870", "Gly-Val"): (-4.44, 0.9144, 3.896),
+        }
+
+        # Collect all scores.json and profile.json
+        docking_results = []
+        interaction_profiles = []
+
+        for sdf_path in input.all_docked:
+            sdf_p = Path(sdf_path)
+            scores_path = sdf_p.parent / "scores.json"
+            profile_path = Path(str(sdf_p.parent).replace(params.dock_dir, params.inter_dir)) / "profile.json"
+
+            if scores_path.exists():
+                with open(scores_path) as f:
+                    docking_results.append(DockingResult.from_dict(json.load(f)))
+
+            if profile_path.exists():
+                with open(profile_path) as f:
+                    d = json.load(f)
+                    interaction_profiles.append(InteractionProfile.from_dict(d))
+
+        weights = {
+            "vina": params.weights.get("vina", 1.0),
+            "cnn_pose": params.weights.get("cnn_pose", 1.0),
+            "cnn_affinity": params.weights.get("cnn_affinity", 1.0),
+        }
+
+        Path(output.master_csv).parent.mkdir(parents=True, exist_ok=True)
+        ranked = aggregate_results(docking_results, interaction_profiles, weights)
+        write_master_csv(ranked, output.master_csv)
+
+        heatmap = build_heatmap_matrix(ranked, score_col="cnn_affinity")
+        with open(output.heatmap_csv, "w", newline="") as f:
+            if heatmap:
+                cols = list(next(iter(heatmap.values())).keys())
+                w = _csv.DictWriter(f, fieldnames=["seq_id"] + cols)
+                w.writeheader()
+                for sid, row in heatmap.items():
+                    w.writerow({"seq_id": sid, **row})
+
+        # Write validation_table.tsv (M4 / C5 requirement)
+        Path(output.validation_table).parent.mkdir(parents=True, exist_ok=True)
+        vt_cols = [
+            "case_id", "lig_id", "pocket_rank", "exec_mode",
+            "expected_vina", "observed_vina", "delta_vina",
+            "expected_cnn_pose", "observed_cnn_pose", "delta_cnn_pose",
+            "expected_cnn_aff", "observed_cnn_aff", "delta_cnn_aff",
+            "pass_fail",
+        ]
+        VINA_TOL, CNN_POSE_TOL, CNN_AFF_TOL = 0.5, 0.05, 0.5
+
+        with open(output.validation_table, "w", newline="") as f:
+            w = _csv.DictWriter(f, fieldnames=vt_cols, delimiter="\t")
+            w.writeheader()
+            for res in docking_results:
+                if res.pocket_rank != 1:
+                    continue
+                gt = _GROUND_TRUTH.get((res.seq_id, res.lig_id))
+                if gt is None:
+                    continue
+                exp_v, exp_p, exp_a = gt
+                bp = res.best_pose
+                dv = abs(bp.vina_affinity - exp_v)
+                dp = abs(bp.cnn_pose_score - exp_p)
+                da = abs(bp.cnn_affinity - exp_a)
+                ok = (dv <= VINA_TOL and dp <= CNN_POSE_TOL and da <= CNN_AFF_TOL)
+                w.writerow({
+                    "case_id": res.seq_id, "lig_id": res.lig_id,
+                    "pocket_rank": res.pocket_rank, "exec_mode": params.exec_mode,
+                    "expected_vina": exp_v, "observed_vina": round(bp.vina_affinity, 3),
+                    "delta_vina": round(dv, 3),
+                    "expected_cnn_pose": exp_p, "observed_cnn_pose": round(bp.cnn_pose_score, 4),
+                    "delta_cnn_pose": round(dp, 4),
+                    "expected_cnn_aff": exp_a, "observed_cnn_aff": round(bp.cnn_affinity, 3),
+                    "delta_cnn_aff": round(da, 3),
+                    "pass_fail": "PASS" if ok else "FAIL",
+                })
+
+        with open(log[0], "w") as lf:
+            lf.write(f"Aggregated {len(ranked)} ranked pairs.\n")
+            lf.write(f"validation_table.tsv written: {output.validation_table}\n")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 11 — Visualization & HTML report
+# ─────────────────────────────────────────────────────────────────────────────
+rule visualize:
+    """Stage 11: Generate per-pair py3Dmol HTML + ChimeraX .cxc + project report.
+
+    Reads:
+      - report/docking_master.csv
+      - docking/**/docked.sdf
+      - structures/**/dock_region.pdb
+    Writes:
+      - visualization/ (per-pair HTML + CXC files)
+      - report/dad_report.html
+    """
+    input:
+        master_csv  = rules.aggregate.output.master_csv,
+        all_docked  = expand_docking_outputs,
+    output:
+        report_html = os.path.join(REPORT_DIR, "dad_report.html"),
+        viz_dir     = directory(VIZ_DIR),
+    params:
+        py3dmol_width  = config["visualization"]["py3dmol_width"],
+        py3dmol_height = config["visualization"]["py3dmol_height"],
+        generate_cxc   = config["visualization"]["generate_cxc"],
+        top_k          = config["ranking"]["top_k"],
+        struct_dir     = STRUCT_DIR,
+        inter_dir      = INTER_DIR,
+        exec_mode      = config.get("execution", {}).get("mode", "live"),
+    log:
+        os.path.join(RESULTS, "logs", "visualize.log"),
+    threads: 1
+    run:
+        from dad.io import DockingResult, InteractionProfile
+        from dad.core.visualize import (
+            run_visualization_batch, generate_html_report,
+        )
+
+        Path(output.viz_dir).mkdir(parents=True, exist_ok=True)
+
+        viz_inputs = []
+        skipped_replay = []
+        for sdf_path in input.all_docked:
+            sdf_p = Path(sdf_path)
+            pocket_dir = sdf_p.parent
+            lig_dir = pocket_dir.parent
+            seq_dir = lig_dir.parent
+            seq_id = seq_dir.name
+            lig_id = lig_dir.name
+            pocket_str = pocket_dir.name
+
+            receptor = Path(params.struct_dir) / seq_id / "dock_region.pdb"
+            profile_path = (
+                Path(params.inter_dir) / seq_id / lig_id / pocket_str / "profile.json"
+            )
+
+            if not receptor.exists():
+                continue
+
+            # Replay mode: docked SDF contains sentinel comment, not a real pose
+            is_replay_sdf = False
+            if sdf_p.exists():
+                first_line = ""
+                with open(sdf_p) as fh:
+                    first_line = fh.readline()
+                if "replay mode" in first_line or "no docked pose" in first_line:
+                    is_replay_sdf = True
+
+            if is_replay_sdf or params.exec_mode == "tier1_replay":
+                skipped_replay.append(f"{seq_id} x {lig_id} {pocket_str}")
+                continue
+
+            if not sdf_p.exists():
+                continue
+
+            profile = None
+            if profile_path.exists():
+                with open(profile_path) as f:
+                    profile = InteractionProfile.from_dict(json.load(f))
+
+            viz_inputs.append({
+                "receptor_pdb": str(receptor),
+                "docked_sdf": str(sdf_p),
+                "profile": profile,
+                "seq_id": seq_id,
+                "lig_id": lig_id,
+                "pocket": pocket_str,
+                "output_dir": output.viz_dir,
+                "width": params.py3dmol_width,
+                "height": params.py3dmol_height,
+                "generate_cxc": params.generate_cxc,
+            })
+
+        run_visualization_batch(viz_inputs)
+        generate_html_report(
+            master_csv=input.master_csv,
+            viz_dir=output.viz_dir,
+            output_html=output.report_html,
+            top_k=params.top_k,
+        )
+
+        with open(log[0], "w") as lf:
+            lf.write(f"Visualized {len(viz_inputs)} pairs. Report: {output.report_html}\n")
+            if skipped_replay:
+                lf.write(
+                    "visualization unavailable: missing docked pose (replay mode) for: "
+                    + ", ".join(skipped_replay) + "\n"
+                )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 12 — Reproducibility manifest
+# ─────────────────────────────────────────────────────────────────────────────
+rule manifest:
+    """Stage 12: Write a reproducibility manifest with versions, seeds, checksums."""
+    input:
+        report_html = rules.visualize.output.report_html,
+        master_csv  = rules.aggregate.output.master_csv,
+    output:
+        manifest    = os.path.join(RESULTS, "manifest.json"),
+    log:
+        os.path.join(RESULTS, "logs", "manifest.log"),
+    threads: 1
+    run:
+        import hashlib, datetime, subprocess as _sp
+
+        def _version(cmd):
+            try:
+                r = _sp.run(cmd, capture_output=True, text=True, timeout=5)
+                return r.stdout.strip().splitlines()[0] if r.returncode == 0 else "unavailable"
+            except Exception:
+                return "unavailable"
+
+        def _sha256(path):
+            h = hashlib.sha256()
+            try:
+                with open(path, "rb") as f:
+                    for chunk in iter(lambda: f.read(65536), b""):
+                        h.update(chunk)
+                return h.hexdigest()
+            except Exception:
+                return "unavailable"
+
+        try:
+            import rdkit; rdkit_ver = rdkit.__version__
+        except Exception:
+            rdkit_ver = "unavailable"
+        try:
+            import Bio; bio_ver = Bio.__version__
+        except Exception:
+            bio_ver = "unavailable"
+
+        manifest = {
+            "dad_version": "0.1.0-beta",
+            "generated_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "config": dict(config),
+            "tool_versions": {
+                "gnina": _version(["gnina", "--version"]),
+                "colabfold": _version(["colabfold_batch", "--version"]),
+                "p2rank": _version([config["pocket"]["p2rank_path"], "--version"]),
+                "rdkit": rdkit_ver,
+                "biopython": bio_ver,
+                "plip": _version([config["interaction"]["plip_path"], "--version"]),
+            },
+            "output_checksums": {
+                "docking_master.csv": _sha256(input.master_csv),
+                "dad_report.html": _sha256(input.report_html),
+            },
+        }
+        with open(output.manifest, "w") as f:
+            json.dump(manifest, f, indent=2)
+
+        with open(log[0], "w") as lf:
+            lf.write(f"Manifest written: {output.manifest}\n")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Default target: run complete pipeline
+# ─────────────────────────────────────────────────────────────────────────────
+rule all:
+    """Run the complete DAD pipeline (Stages 0-12)."""
+    input:
+        rules.manifest.output.manifest,
+        rules.visualize.output.report_html,
+        rules.aggregate.output.master_csv,
+        rules.aggregate.output.validation_table,

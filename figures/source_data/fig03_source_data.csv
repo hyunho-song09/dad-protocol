@@ -1,0 +1,17 @@
+case_id,family,top_pose_rmsd_a,best_pose_rmsd_a,redock_pass,best_pose_pass
+CRP_SP1_4R8H,crp_fnr_regulator,0.366,0.366,PASS,PASS
+CRP_CMP_1I5Z,crp_fnr_regulator,0.288,0.288,PASS,PASS
+CRP_CMP_1G6N,crp_fnr_regulator,0.301,0.301,PASS,PASS
+CRP_CMP_2CGP,crp_fnr_regulator,0.281,0.281,PASS,PASS
+TAR_ASP_2LIG,mcp_ligand_binding_domain,0.797,0.354,PASS,PASS
+TAR_ASP_1VLT,mcp_ligand_binding_domain,3.009,1.627,FAIL,PASS
+LAOBP_LYS_1LST,amino_acid_binding,0.746,0.746,PASS,PASS
+LBP_PHE_1USI,amino_acid_binding,0.428,0.404,PASS,PASS
+LBP_LEU_1USK,amino_acid_binding,0.799,0.463,PASS,PASS
+GGBP_GLC_2FVY,periplasmic_sugar_binding,0.694,0.694,PASS,PASS
+MBP_GLC_1ANF,periplasmic_sugar_binding,5.124,3.464,FAIL,FAIL
+MBP_GLC_3MBP,periplasmic_sugar_binding,5.003,0.626,FAIL,PASS
+RBSB_RIB_3KSM,periplasmic_sugar_binding,12.778,1.572,FAIL,PASS
+GGBP_GLC_2B3B,periplasmic_sugar_binding,0.155,0.155,PASS,PASS
+RBSB_RIB_1DBP,periplasmic_sugar_binding,0.305,0.305,PASS,PASS
+RBSB_RIB_1DRJ,periplasmic_sugar_binding,0.154,0.154,PASS,PASS

@@ -1,0 +1,138 @@
+# DAD Publication — Filled Placeholders (User input + Web search 2026-05-08)
+# Source: User directive 2026-05-08; primary paper user-corrected to iScience 2026 published
+# Mode: B (full submission eligible) — primary paper is peer-reviewed and published
+
+# ───────────────────────────────────────────────────────
+# Category 1 — Primary research paper (사용자 정정: iScience 2026)
+# ───────────────────────────────────────────────────────
+primary_paper:
+  status: "PUBLISHED in iScience (Cell Press, 2026) — peer-reviewed accepted"
+  journal: "iScience"
+  publisher: "Cell Press / Elsevier"
+  year: 2026
+  pii: "S2589-0042(26)01130-2"
+  doi_format: "10.1016/j.isci.2026.<article_id>"
+  doi: "[USER_VERIFY: see iScience landing page for exact DOI; PII S2589-0042(26)01130-2 maps to DOI of form 10.1016/j.isci.2026.NNNNNN]"
+  url: "https://www.cell.com/iscience/fulltext/S2589-0042(26)01130-2"
+  title: "Keratin degradation reflects a starvation survival strategy in Fervidobacterium islandicum AW-1"
+  full_citation: "Sung J-Y, Kim J-Y, Jin H-S, Baek J-H, Kim NE, Song HH, Bong S-H, Lee Y-J, Kim B-C, Lee DY, Lee D-W. Keratin degradation reflects a starvation survival strategy in Fervidobacterium islandicum AW-1. iScience. 2026 (Cell Press); PII S2589-0042(26)01130-2."
+  authors_short: "Sung et al. 2026"
+  bibtex_key: "Sung2026KeratinStarvationFI"
+  figure_or_supplement_ref: "iScience supplementary material (Reviewer #2 docking validation, integrated in published version); the six docking ground-truth values used as DAD's Tier 1 replay regression set are reproduced verbatim in Claude_web/Revision.txt and validated in Publication/supplementary/SI_data/SI_data_tier1_replay.tsv. Exact figure/table number to be confirmed by user against published iScience version."
+  relationship_to_DAD: "DAD is the methodological packaging of the protein–metabolite docking analysis used in Sung et al. iScience 2026 (chemotaxis-linked persister-like adaptation section). Tier 1 of DAD reproduces this primary paper's docking values to bit-equal accuracy (all Δ = 0). The peer-reviewed acceptance of the primary paper satisfies Nature Protocols' supporting-research-paper requirement."
+  paper_status_for_DAD_submission: "Mode B (full Nature Protocols submission) — primary paper is peer-reviewed and published in iScience 2026, satisfying Nature Protocols' supporting primary paper requirement. The earlier 'conditional / presubmission-enquiry' framing in codex Round 6 was based on the bioRxiv preprint stage; that conditional is now lifted."
+
+# ───────────────────────────────────────────────────────
+# Category 2 — GitHub repo (사용자 결정: 새 repo 임박 — team-lead 제안)
+# ───────────────────────────────────────────────────────
+github:
+  username: "hyunho-song09"
+  url: "https://github.com/hyunho-song09/dad-protocol"
+  ssh_url: "git@github.com:hyunho-song09/dad-protocol.git"
+  https_url: "https://github.com/hyunho-song09/dad-protocol.git"
+  oauth_status: "user OAuth completed 2026-05-08; username confirmed 2026-05-08"
+  proposal:
+    repo_name: "dad-protocol"
+    suggested_alts: ["dad-docking", "dad-workflow", "dad-nature-protocols"]
+    visibility: "public"
+    visibility_rationale: "Nature Protocols 는 acceptance 시 open code 요구; 처음부터 public 으로 두면 history 정리 불필요 + reviewer 가 직접 접근 가능"
+    description: "DAD: many-to-many protein-metabolite docking with pre-docking biological triage. Companion protocol to Sung et al. iScience 2026 (Fervidobacterium islandicum AW-1 keratin starvation study)."
+    default_branch: "main"
+    license_root: "MIT (for dad/ core); third-party dependencies separately licensed (see code_availability.md)"
+    initial_files: "Publication/* (manuscript / SI / figures / tables / code / references / submission_metadata) + DAD_protocol.ipynb (top-level for Colab badge)"
+    branch_protection: "not needed at presubmission stage"
+    repo_url_target: "https://github.com/{user_github_username}/dad-protocol"
+  zenodo_doi: "(on hold per user, 2026-05-08)"
+  git_tag_proposed: "v0.1.0"  # full submission mode이므로 -presubmission 접미어 제거
+  colab_badge_target_path: "DAD_protocol.ipynb"
+  colab_badge_url: "https://colab.research.google.com/github/hyunho-song09/dad-protocol/blob/main/DAD_protocol.ipynb"
+  colab_badge_url_alt_path: "https://colab.research.google.com/github/hyunho-song09/dad-protocol/blob/main/code/notebooks/DAD_protocol.ipynb"
+
+# ───────────────────────────────────────────────────────
+# Category 3 — Authors and corresponding (사용자 직접 제공)
+# ───────────────────────────────────────────────────────
+authors:
+  - position: 1
+    role: "first author"
+    name_full: "Hyun Ho Song"
+    name_initials: "Song HH"
+    email: "shh0409@snu.ac.kr"
+    affiliations:
+      - id: "a"
+        text: "Department of Agricultural Biotechnology, Seoul National University, Seoul, Republic of Korea"
+  - position: 2
+    role: "corresponding author"
+    name_full: "Do Yup Lee"
+    name_initials: "Lee DY"
+    email: "rome73@snu.ac.kr"
+    scopus_link: "https://www.scopus.com/authid/detail.uri?authorId=...(verify)"
+    affiliations:
+      - id: "a"
+        text: "Department of Agricultural Biotechnology, Seoul National University, Seoul 08826, Republic of Korea"
+      - id: "b"
+        text: "Center for Food and Bioconvergence, Research Institute for Agricultural and Life Sciences, Interdisciplinary Programs in Agricultural Genomics, Seoul National University, Seoul 08826, Republic of Korea"
+      - id: "c"
+        text: "Green Bio Science & Technology, Bio-Food Industrialization, Seoul National University, 1447 Pyeongchang-daero, Daehwa-Myeon, Pyeongchang-Gun, Gangwon-Do 25354, Republic of Korea"
+    corresponding_at: "Department of Agricultural Biotechnology, Seoul National University, Seoul 08826, Republic of Korea"
+submission_date: "[TBD — Mode A presubmission first; full submission after primary paper acceptance]"
+
+# ───────────────────────────────────────────────────────
+# Category 4 — Suggested reviewers (5)
+# ───────────────────────────────────────────────────────
+reviewers:
+  - id: R1
+    name: "Prof. Chaok Seok"
+    email: "chaok@snu.ac.kr"
+    affiliation: "Department of Chemistry, Seoul National University, Republic of Korea"
+    expertise: "protein structure prediction, molecular docking (GalaxyTongDock, GalaxyDock)"
+    rationale: "Leading docking-algorithm developer in Korea; uniquely qualified to assess GNINA scoring assumptions and the zero-parameter design choice."
+  - id: R2
+    name: "Prof. Martin Steinegger"
+    email: "(public email at https://steineggerlab.com or Seoul National University directory)"
+    affiliation: "Steinegger Lab, Seoul National University, Korea (formerly Max Planck Institute for Developmental Biology)"
+    expertise: "MMseqs2, ColabFold co-author, scalable protein sequence/structure analysis"
+    rationale: "Co-author of ColabFold which DAD's Stage 4 invokes; uniquely positioned to assess the AlphaFold-DB / ColabFold integration and reproducibility of the structure-prediction stage."
+  - id: R3
+    name: "Dr. Björn Grüning"
+    email: "bjoern.gruening@gmail.com"
+    affiliation: "Bioinformatics Group, Department of Computer Science, University of Freiburg, Germany"
+    expertise: "Galaxy workflow project, cheminformatics, reproducible pipelines"
+    rationale: "Galaxy/Snakemake ecosystem authority; reviews from the reproducibility-first standpoint that Nature Protocols requires for protocol-class manuscripts."
+  - id: R4
+    name: "Prof. Arne Elofsson"
+    email: "arne.elofsson@dbb.su.se"
+    affiliation: "Department of Biochemistry and Biophysics, Stockholm University, Sweden"
+    expertise: "membrane protein topology prediction (Phobius lineage), AlphaFold validation"
+    rationale: "His group co-developed the Phobius lineage that DAD's optional triage path uses; uniquely qualified to assess the topology-aware pre-docking biological triage."
+  - id: R5
+    name: "Prof. Pieter Dorrestein"
+    email: "pdorrestein@ucsd.edu"
+    affiliation: "Skaggs School of Pharmacy and Pharmaceutical Sciences, UC San Diego, USA"
+    expertise: "metabolomics, GNPS, mass spectrometry, microbial natural products"
+    rationale: "Metabolomics community thought leader (GNPS); evaluates whether the many-to-many protein–metabolite matrix output is useful for downstream hypothesis generation in real metabolomics workflows."
+
+# ───────────────────────────────────────────────────────
+# Category 5 — SI-Methods references (best fit selected by team-lead)
+# ───────────────────────────────────────────────────────
+si_methods_refs:
+  - bibtex_key: "Kall2007Phobius"
+    citation: "Käll L, Krogh A, Sonnhammer ELL. (2007) Advantages of combined transmembrane topology and signal peptide prediction—the Phobius web server. Nucleic Acids Research 35(suppl_2):W429–W432. doi:10.1093/nar/gkm256"
+    used_in_section: "SI-Methods §R1–R3 (signal peptide cleavage and transmembrane topology) — describes the optional triage backend."
+  - bibtex_key: "Hallgren2022DeepTMHMM"
+    citation: "Hallgren J, Tsirigos KD, Damgaard Pedersen M, Almagro Armenteros JJ, Marcatili P, Nielsen H, Krogh A, Winther O. (2022) DeepTMHMM predicts alpha and beta transmembrane proteins using deep neural networks. bioRxiv. doi:10.1101/2022.04.08.487609"
+    used_in_section: "SI-Methods §R3 (default DeepTMHMM topology call); R5 functional class context."
+  - bibtex_key: "Krell2011Diversity"
+    citation: "Krell T, Lacal J, Muñoz-Martínez F, Reyes-Darias JA, Cadirci BH, García-Fontana C, Ramos JL. (2011) Diversity at a structural level: bacterial chemoreceptors detect ligands in different ways. Environmental Microbiology 13(7):1684–1690. doi:10.1111/j.1462-2920.2011.02493.x"
+    used_in_section: "SI-Methods §R5 (functional class — MCP/CRP/SBP recognition); justifies the family-aware triage cutoffs and explains observed family bias of CNN ranking failures."
+  - bibtex_key: "DrewBoudker2016Transporters"
+    citation: "Drew D, Boudker O. (2016) Shared molecular mechanisms of membrane transporters. Annual Review of Biochemistry 85:543–572. doi:10.1146/annurev-biochem-060815-014520"
+    used_in_section: "SI-Methods §R3–R4 (TM-rich transporters: dock-region extraction logic); SI-Notes §11.2 family-bias hypothesis (induced-fit)."
+  - bibtex_key: "Briegel2014ChemoreceptorArchitecture"
+    citation: "Briegel A, Ladinsky MS, Oikonomou C, Jones CW, Harris MJ, Fowler DJ, Chang Y-W, Thompson LK, Armitage JP, Jensen GJ. (2014) Structural conservation of chemotaxis machinery across Archaea and Bacteria. Environmental Microbiology Reports 6(2):116–122. doi:10.1111/1758-2229.12181"
+    used_in_section: "SI-Methods §R5 (chemoreceptor cytoplasmic-domain conservation) and SI-Notes §11.2 family-bias rationale (MCP architecture)."
+
+# ───────────────────────────────────────────────────────
+# Category 6 — Embargo / co-submission (사용자 보류)
+# ───────────────────────────────────────────────────────
+embargo_decision: "[USER_DEFER]"
+co_submission_decision: "[USER_DEFER]"

@@ -1,0 +1,7 @@
+case_id	lig_id	exec_mode	expected_vina	observed_vina	delta_vina	expected_cnn_pose	observed_cnn_pose	delta_cnn_pose	expected_cnn_aff	observed_cnn_aff	delta_cnn_aff	pass_fail
+MCP-AlaIle	Ala-Ile	tier1_replay	-5.61	-5.61	0.0	0.8995	0.8995	0.0	4.416	4.416	0.0	PASS
+MCP-GlyVal	Gly-Val	tier1_replay	-5.18	-5.18	0.0	0.8468	0.8468	0.0	4.022	4.022	0.0	PASS
+Crp-AlaIle	Ala-Ile	tier1_replay	-6.01	-6.01	0.0	0.6228	0.6228	0.0	4.642	4.642	0.0	PASS
+Crp-GlyVal	Gly-Val	tier1_replay	-5.59	-5.59	0.0	0.7353	0.7353	0.0	4.574	4.574	0.0	PASS
+RbsB-AlaIle	Ala-Ile	tier1_replay	-4.92	-4.92	0.0	0.4447	0.4447	0.0	3.516	3.516	0.0	PASS
+RbsB-GlyVal	Gly-Val	tier1_replay	-4.44	-4.44	0.0	0.9144	0.9144	0.0	3.896	3.896	0.0	PASS

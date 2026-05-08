@@ -1,0 +1,152 @@
+# DAD (Dynamic Affinity Dock) — Pipeline Configuration
+# Zero-parameter defaults transcribed from seed notebooks (gnina.ipynb, AlphaFold2.ipynb)
+# Users should NOT need to modify this file for standard analyses.
+# All values are literature-recommended or empirically validated defaults.
+
+# ─────────────────────────────────────────────
+# Stage 1 — Input paths (override per run via --config)
+# ─────────────────────────────────────────────
+input:
+  fasta: "01_Tier1_input/proteins/tier1_proteins.fasta"  # multi-FASTA: ORF translations
+  smiles: "01_Tier1_input/ligands/dipeptides.smi"        # CSV/TSV with columns: id, smiles
+  organism: ""                              # optional: organism name hint
+  expected_localization: ""                 # optional: e.g., "periplasmic"
+
+# ─────────────────────────────────────────────
+# Stage 2 — Sequence QC & dereplication
+# ─────────────────────────────────────────────
+qc:
+  min_length: 30                            # minimum AA length to retain
+  max_length: 5000                          # maximum AA length
+  identity_threshold: 0.95                  # MMseqs2 / CD-HIT clustering cutoff
+  coverage: 0.80                            # alignment coverage for clustering
+
+# ─────────────────────────────────────────────
+# Stage 3 — Pre-docking biological triage
+# ─────────────────────────────────────────────
+triage:
+  topology_tool: "deeptmhmm"                # "deeptmhmm" (default, open) | "phobius" (license required)
+  annotation_tools: ["hmmer", "foldseek"]   # functional annotation backends
+  min_extracellular_length: 50              # AA — cytoplasmic-only TM proteins excluded
+  pfam_evalue: 1.0e-5                       # HMMER vs Pfam E-value cutoff
+  foldseek_evalue: 1.0e-3                   # Foldseek vs AFDB E-value cutoff
+  priority_families:                        # protein families flagged as high-priority
+    - "MCP"
+    - "Crp_FNR"
+    - "SBP"                                 # substrate-binding proteins
+    - "Sensor_HK"
+
+# ─────────────────────────────────────────────
+# Stage 4 — Structure prediction (ColabFold v1.6.1 defaults)
+# ─────────────────────────────────────────────
+structure:
+  tool: "colabfold"                         # "colabfold" | "esmfold" | "boltz1"
+  model_type: "auto"                        # auto: ptm for monomer, multimer_v3 for complex
+  msa_mode: "mmseqs2_uniref_env"            # ColabFold MSA generation mode
+  num_recycles: 3                           # None = auto (20 for multimer)
+  num_seeds: 1                              # stochastic sampling seeds
+  num_models: 5                             # number of AF2 models to run
+  use_dropout: false                        # for uncertainty estimation
+  use_amber: false                          # Amber relaxation
+  template_mode: "none"                     # "none" | "pdb100" | "custom"
+  pair_mode: "unpaired_paired"
+  pairing_strategy: "greedy"
+  save_all: false
+  save_recycles: false
+  plddt_min: 70.0                           # flag structures with mean pLDDT < 70
+
+# ─────────────────────────────────────────────
+# Stage 5 — Pocket detection (P2Rank)
+# ─────────────────────────────────────────────
+pocket:
+  tool: "p2rank"
+  p2rank_path: "prank"                      # path to prank executable
+  alphafold_mode: true                      # use -c alphafold for AF2 models
+  top_n_pockets: 3                          # number of top pockets to carry forward
+  min_score: 0.0                            # P2Rank pocket score minimum threshold
+
+# ─────────────────────────────────────────────
+# Stage 6 — Ligand preparation
+# ─────────────────────────────────────────────
+ligand:
+  ph: 7.4                                   # protonation pH (Open Babel)
+  force_field: "MMFF94"                     # RDKit 3D embedding force field
+  add_hydrogens: true
+  enumerate_tautomers: false                # Dimorphite-DL tautomer enumeration
+  enumerate_stereo: false
+
+# ─────────────────────────────────────────────
+# Stage 7-8 — Docking (GNINA 1.3.2 defaults)
+# Seed notebook: exhaustiveness=32, num_modes=9, seed=0, box=22 Å
+# ─────────────────────────────────────────────
+docking:
+  gnina_path: "gnina"                       # path to gnina binary
+  exhaustiveness: 32                        # search exhaustiveness
+  num_modes: 9                              # number of binding poses to output
+  seed: 0                                   # random seed for reproducibility
+  box_size_min: 22                          # minimum box side length in Angstroms
+  box_padding: 10                           # padding beyond ligand max dimension (Å)
+  cnn_scoring: "rescore"                    # "rescore" | "refinement" | "all"
+  addH: true                               # add hydrogens to receptor in GNINA
+
+# ─────────────────────────────────────────────
+# Stage 9 — Interaction profiling
+# ─────────────────────────────────────────────
+interaction:
+  contact_distance: 5.0                     # Å cutoff for contact residues (seed notebook)
+  use_plip: true                            # run PLIP for H-bond / hydrophobic classification
+  plip_path: "plip"
+
+# ─────────────────────────────────────────────
+# Stage 10 — Aggregation & ranking
+# ─────────────────────────────────────────────
+ranking:
+  score_weights:                            # composite rank = z(vina)*w1 + z(cnn_pose)*w2 + z(cnn_affinity)*w3
+    vina: 1.0
+    cnn_pose: 1.0
+    cnn_affinity: 1.0
+  top_k: 10                                 # top-K pairs to highlight in report
+
+# ─────────────────────────────────────────────
+# Stage 11 — Visualization
+# ─────────────────────────────────────────────
+visualization:
+  py3dmol_width: 900
+  py3dmol_height: 600
+  chimerax_path: "chimerax"                 # path to ChimeraX binary (optional)
+  generate_html: true
+  generate_cxc: true
+
+# ─────────────────────────────────────────────
+# Stage 12 — Reproducibility
+# ─────────────────────────────────────────────
+reproducibility:
+  manifest_file: "results/manifest.json"
+  record_versions: true
+  record_checksums: true
+
+# ─────────────────────────────────────────────
+# Execution mode
+# ─────────────────────────────────────────────
+execution:
+  mode: "tier1_replay"                      # "tier1_replay" | "live"
+  # tier1_replay: Stage 4/5 use AW1_ref manifest, Stage 8 uses replay_from_ground_truth()
+  # live:         runs ColabFold, P2Rank, and GNINA normally
+
+# ─────────────────────────────────────────────
+# AW1_ref manifest (M1: canonical asset index)
+# ─────────────────────────────────────────────
+aw1_ref:
+  manifest_path: "06_Report/Mr_Repro/aw1_ref_manifest.tsv"
+
+# Tier 1 replay benchmark source
+benchmark:
+  revision_table_path: "Claude_web/Revision.txt"
+
+# ─────────────────────────────────────────────
+# Compute resources
+# ─────────────────────────────────────────────
+resources:
+  threads_default: 4
+  gpu: false                                # set true if GPU is available for ColabFold/GNINA
+  max_memory_gb: 16

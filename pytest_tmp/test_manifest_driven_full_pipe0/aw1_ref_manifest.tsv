@@ -1,0 +1,3 @@
+asset_id	seq_id	gene	stage	asset_type	path	selection_reason	sha256
+MCP_AF2_PDB	NA23_RS01195	mcpB	4	pdb	D:\project\experiment\DAD\AW1_ref\structure_MCP.pdb	Tier1 canonical structure	placeholder
+MCP_P2RANK	NA23_RS01195	mcpB	5	p2rank_csv	D:\project\experiment\DAD\AW1_ref\structure.pdb_predictions_MCP.csv	Tier1 canonical pocket	placeholder

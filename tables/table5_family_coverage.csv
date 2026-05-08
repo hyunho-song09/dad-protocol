@@ -1,0 +1,5 @@
+family,cases,top_pose_pass,best_of_9_pass,median_top_rmsd_angstrom,notes
+amino_acid_binding,3,3,3,0.746,"Lysine, phenylalanine, leucine — robust CNN ranking"
+crp_fnr_regulator,4,4,4,0.294,"cAMP analogs — perfect top-pose recovery"
+mcp_ligand_binding_domain,2,1,2,1.903,"Aspartate — 1 ranking failure (TAR_ASP_1VLT), recovered best-of-9"
+periplasmic_sugar_binding,7,4,6,0.694,"Glucose, arabinose, ribose — 3 failures (MBP 2, RbsB 1), 1 search failure"

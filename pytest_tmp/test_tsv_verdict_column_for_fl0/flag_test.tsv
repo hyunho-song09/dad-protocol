@@ -1,0 +1,2 @@
+orf_id	verdict	triage_status	n_tm	has_signal_peptide	dock_region_start	dock_region_end	dock_length	functional_class	priority_tier	notes	tool_used	source_tier
+hypo	downrank	FLAG	0	False	1	100	100	HYPOTHETICAL	LOW	R3: nTM=0 — soluble/cytoplasmic; full mature sequence passed; R5: hypothetical/DUF — FLAG; proceed with low confidence	mock	Tier1

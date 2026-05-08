@@ -1,0 +1,28 @@
+
+     RDKit          3D
+
+  3  2  0  0  0  0  0  0  0  0999 V2000
+    1.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    2.5000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    4.0000    0.0000    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0
+  2  3  1  0
+M  END
+REMARK minimizedAffinity -5.00
+REMARK CNNscore 0.5000
+REMARK CNNaffinity 2.000
+$$$$
+
+     RDKit          3D
+
+  3  2  0  0  0  0  0  0  0  0999 V2000
+   11.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   12.5000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   14.0000    0.0000    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0
+  2  3  1  0
+M  END
+REMARK minimizedAffinity -6.00
+REMARK CNNscore 0.9500
+REMARK CNNaffinity 5.000
+$$$$

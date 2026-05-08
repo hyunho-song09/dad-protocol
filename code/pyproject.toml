@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dad-dynamic-affinity-dock"
+version = "0.1.0"
+description = "Dynamic Affinity Dock many-to-many protein-metabolite docking workflow"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "DAD protocol authors" }
+]
+keywords = [
+  "molecular docking",
+  "chemotaxis",
+  "protein-metabolite interaction",
+  "GNINA",
+  "Nature Protocols"
+]
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "pandas>=1.5",
+  "scikit-learn>=1.2",
+  "matplotlib>=3.7",
+  "biopython>=1.81"
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=7",
+  "rdkit>=2023.9"
+]
+workflow = [
+  "snakemake>=7"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dad*"]

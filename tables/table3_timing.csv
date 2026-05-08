@@ -1,0 +1,14 @@
+stage,replay_mode,RTX_2060_live,Colab_T4_estimated,note
+1_ingest,< 1 s,< 1 s,< 1 s,I/O bound
+2_qc_derep,< 1 s,~ 1 s,~ 1 s,sequence parsing
+3_triage,< 1 s (precomputed),~ 30 s/sequence (DeepTMHMM API),~ 30 s/sequence,DeepTMHMM REST or local
+4_structure_pred,0 s (AW1_ref reuse),5-15 min/protein (ColabFold),5-15 min/protein,(estimated) AF2/AF3 dependent on MSA
+5_pocket_detect,0 s (CSV reuse),~ 30 s/structure,~ 30 s/structure,P2Rank
+6_ligand_prep,< 1 s/ligand,< 1 s/ligand,< 1 s/ligand,RDKit ETKDGv3 + MMFF
+7_box_config,< 1 s/case,< 1 s/case,< 1 s/case,deterministic
+8_dock,0 s (replay from Revision.txt),12-17 s/case (RTX 2060 measured),20-40 s/case (estimated T4),exhaustiveness=32 num_modes=9
+9_interaction,< 5 s/case,~ 5 s/case,~ 5 s/case,Bio.PDB contacts; PLIP optional
+10_aggregate,< 1 s,< 1 s,< 1 s,pandas
+11_visualize,< 5 s,~ 5 s,~ 5 s,py3Dmol + cxc
+12_manifest,< 5 s,~ 5 s,~ 5 s,SHA256 calc
+total_Tier1_6cases,< 1 s end-to-end,~ 4 min (RCSB seed 16 case wall-clock measured),~ 5-8 min (estimated),acceptance Δvina ≤ 0.5 / Δcnn_pose ≤ 0.05 / RMSD ≤ 2.0 A

@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Jupyter
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+pytest_tmp_*/
+
+# Mypy / linting caches
+.mypy_cache/
+.ruff_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# DAD-specific exclusions
+# GNINA binary is NOT redistributed — users install separately
+gnina.1.3.2
+gnina*.bin
+tools/gnina/gnina*
+
+# Large user-side runtime caches (Colab Drive workspace)
+results/
+.dad_cache/
+data/cache/
+
+# Sensitive — never commit
+*.env
+.env.*
+secrets/
+*.pem
+*.key

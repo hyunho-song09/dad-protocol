@@ -1,0 +1,14 @@
+database,url,license,commercial_use,redistribution_allowed,access_method,registration_required,used_in_DAD_phase
+RCSB PDB,https://www.rcsb.org/,CC0 1.0 Universal,allowed,allowed,REST API + bulk download,no,RCSB seed validation (16 + Phase D 5 candidates)
+AlphaFold DB,https://alphafold.ebi.ac.uk/,CC BY 4.0,allowed,allowed (with attribution),REST API,no,Phase D structure backfill
+BindingDB,https://www.bindingdb.org/,CC BY 3.0,allowed,allowed (with attribution),bulk TSV / REST,no,Phase D extended affinity benchmark (planned)
+BioLiP2,https://zhanggroup.org/BioLiP/,academic-free (commercial: user-verify),user verification,allowed (snapshot),weekly snapshot tar.bz2,no,Phase D biologically-relevant binding sites (planned)
+CrossDocked2020,https://zenodo.org/record/4045263,CC0 / MIT,allowed,allowed,Zenodo bulk,no,Phase D GNINA-aligned benchmark (planned)
+PoseBusters,https://github.com/maabuu/posebusters,MIT,allowed,allowed,pip + benchmark sets,no,Phase D pose validity check (optional)
+ChEMBL,https://www.ebi.ac.uk/chembl/,CC BY-SA 4.0,allowed (share-alike),allowed,REST + bulk SQLite,no,Phase D activity/decoy split for enrichment (planned)
+HMDB,https://hmdb.ca/,CC BY-NC 4.0,not allowed,academic only,bulk XML,no,Phase D ligand pool (NC flag mandatory in manifest)
+MetaboLights,https://www.ebi.ac.uk/metabolights/,CC BY 4.0,allowed,allowed,bulk + REST,no,Phase D ligand metadata (planned)
+PDBbind,(excluded by user policy),(N/A),(N/A),(N/A),(N/A),(N/A),NOT USED (free-DB-only policy)
+CASF-2016,(excluded by user policy),(N/A),(N/A),(N/A),(N/A),(N/A),NOT USED (free-DB-only policy)
+DUD-E,(excluded by user policy),academic-only + bias concerns,(N/A),(N/A),(N/A),(N/A),NOT USED (alternative: ChEMBL active/decoy split)
+DEKOIS,(excluded by user policy),license unclear,(N/A),(N/A),(N/A),(N/A),NOT USED

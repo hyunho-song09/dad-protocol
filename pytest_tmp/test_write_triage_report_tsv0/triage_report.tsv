@@ -1,0 +1,4 @@
+orf_id	verdict	triage_status	n_tm	has_signal_peptide	dock_region_start	dock_region_end	dock_length	functional_class	priority_tier	notes	tool_used	source_tier
+NA23_RS01195	accept	PASS_CLIPPED	2	False	1	160	160	SENSOR_MCP	HIGH	R3: nTM=2 — periplasmic/extracellular domain extracted [1:160]; R5: SENSOR_MCP; priority HIGH	mock	Tier1
+NA23_RS08105	accept	PASS	0	False	1	404	404	REGULATOR_CRP	HIGH	R3: nTM=0 — soluble/cytoplasmic; full mature sequence passed; R5: REGULATOR_CRP; priority HIGH	mock	Tier1
+NA23_RS00870	accept	PASS_CLIPPED	0	True	23	288	266	SBP	HIGH	R2: SP clipped at site 22; mature form docked; R3: nTM=0 — soluble/cytoplasmic; full mature sequence passed; R5: SBP; priority HIGH	mock	Tier1
